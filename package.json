@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node -e \"const fs=require('fs'); if(fs.existsSync('index.dev.html')) fs.copyFileSync('index.dev.html','index.html');\" && vite",
+    "build": "node -e \"const fs=require('fs'); if(fs.existsSync('index.dev.html')) fs.copyFileSync('index.dev.html','index.html');\" && tsc && vite build && node -e \"const fs=require('fs'); fs.cpSync('dist/assets','assets',{recursive:true,force:true}); fs.copyFileSync('dist/index.html','index.html');\"",
     "preview": "vite preview"
   },
   "dependencies": {
