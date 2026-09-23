@@ -8,6 +8,15 @@ import {
   UnoCardData,
 } from '../types/uno';
 
+export interface NetworkFlightEvent {
+  id: string;
+  card: UnoCardData;
+  fromSeatIndex: number | 'draw_pile';
+  toSeatIndex: number | 'discard_pile';
+  faceUp: boolean;
+  delayMs?: number;
+}
+
 export interface SyncedTableState {
   mode: GameMode;
   sevenZeroRule: boolean;
@@ -21,7 +30,7 @@ export interface SyncedTableState {
   skippedPlayerId: string | null;
   awaitingSevenSwapForSeat: number | null;
   winner: Player | null;
-  latestFlight?: CardFlight | null;
+  latestFlight?: NetworkFlightEvent | null;
   latestEffect?: TableSpecialEffect | null;
 }
 
@@ -50,17 +59,12 @@ export type ClientActionMessage =
       targetPlayerId: string;
     };
 
-export type HostBroadcastMessage =
-  | {
-      type: 'WELCOME_ASSIGN_SEAT';
-      assignedSeatIndex: number;
-      roomCode: string;
-      state: SyncedTableState;
-    }
-  | {
-      type: 'STATE_SYNC';
-      state: SyncedTableState;
-    };
+export interface HostBroadcastMessage {
+  type: 'STATE_SYNC';
+  assignedSeatIndex: number;
+  roomCode: string;
+  state: SyncedTableState;
+}
 
 const PEER_PREFIX = 'uno-billiards-royale-';
 
@@ -68,6 +72,7 @@ export class MultiplayerRoomManager {
   private peer: Peer | null = null;
   private connections: Map<number, DataConnection> = new Map();
   private hostConn: DataConnection | null = null;
+  private lastBroadcastState: SyncedTableState | null = null;
 
   public role: 'offline' | 'host' | 'client' = 'offline';
   public roomCode: string = '';
@@ -76,7 +81,10 @@ export class MultiplayerRoomManager {
   public onClientJoined?: (seatIndex: number, playerName: string) => void;
   public onClientLeft?: (seatIndex: number) => void;
   public onClientAction?: (msg: ClientActionMessage) => void;
-  public onStateReceived?: (state: SyncedTableState, assignedSeatIndex?: number) => void;
+  public onStateReceived?: (
+    state: SyncedTableState,
+    assignedSeatIndex: number
+  ) => void;
   public onStatusChange?: (statusText: string) => void;
 
   public generateCode(): string {
@@ -108,33 +116,53 @@ export class MultiplayerRoomManager {
       });
 
       peer.on('connection', (conn) => {
+        // Assign an available seat (1, 2, or 3) immediately upon connection
+        let assignedSeat = -1;
+        for (const candidate of [1, 2, 3]) {
+          if (!this.connections.has(candidate)) {
+            assignedSeat = candidate;
+            break;
+          }
+        }
+
+        if (assignedSeat === -1) {
+          conn.close();
+          return;
+        }
+
+        this.connections.set(assignedSeat, conn);
+
+        conn.on('open', () => {
+          // Immediately send the current state with their assigned seat index (1, 2, or 3)
+          if (this.lastBroadcastState) {
+            conn.send({
+              type: 'STATE_SYNC',
+              assignedSeatIndex: assignedSeat,
+              roomCode: this.roomCode,
+              state: this.lastBroadcastState,
+            } satisfies HostBroadcastMessage);
+          }
+        });
+
         conn.on('data', (raw) => {
           const msg = raw as ClientActionMessage;
           if (msg.type === 'JOIN_HELLO') {
-            // Find an open seat (1, 2, or 3) not yet taken by a live connection
-            let assignedSeat = -1;
-            for (const candidate of [1, 2, 3]) {
-              if (!this.connections.has(candidate)) {
-                assignedSeat = candidate;
-                break;
-              }
-            }
-
-            if (assignedSeat !== -1) {
-              this.connections.set(assignedSeat, conn);
-              this.onClientJoined?.(
-                assignedSeat,
-                msg.playerName || `Player ${assignedSeat + 1}`
-              );
-
-              conn.on('close', () => {
-                this.connections.delete(assignedSeat);
-                this.onClientLeft?.(assignedSeat);
-              });
-            }
+            this.onClientJoined?.(
+              assignedSeat,
+              msg.playerName || `Player ${assignedSeat + 1}`
+            );
           } else {
-            this.onClientAction?.(msg);
+            // Ensure action always uses the verified assignedSeat for this connection
+            this.onClientAction?.({
+              ...msg,
+              seatIndex: assignedSeat,
+            } as ClientActionMessage);
           }
+        });
+
+        conn.on('close', () => {
+          this.connections.delete(assignedSeat);
+          this.onClientLeft?.(assignedSeat);
         });
       });
 
@@ -165,18 +193,16 @@ export class MultiplayerRoomManager {
           this.onStatusChange?.(`CONNECTED TO #${cleanCode}`);
           conn.send({
             type: 'JOIN_HELLO',
-            playerName: playerName.trim() || 'Guest',
+            playerName: playerName.trim() || 'Friend',
           } satisfies ClientActionMessage);
           resolve();
         });
 
         conn.on('data', (raw) => {
           const msg = raw as HostBroadcastMessage;
-          if (msg.type === 'WELCOME_ASSIGN_SEAT') {
+          if (msg && msg.type === 'STATE_SYNC') {
             this.mySeatIndex = msg.assignedSeatIndex;
             this.onStateReceived?.(msg.state, msg.assignedSeatIndex);
-          } else if (msg.type === 'STATE_SYNC') {
-            this.onStateReceived?.(msg.state);
           }
         });
 
@@ -197,24 +223,18 @@ export class MultiplayerRoomManager {
     });
   }
 
-  public broadcastState(state: SyncedTableState, welcomeSeat?: number) {
+  public broadcastState(state: SyncedTableState) {
+    this.lastBroadcastState = state;
     if (this.role !== 'host') return;
 
     this.connections.forEach((conn, seatIdx) => {
       if (!conn.open) return;
-      if (welcomeSeat === seatIdx) {
-        conn.send({
-          type: 'WELCOME_ASSIGN_SEAT',
-          assignedSeatIndex: seatIdx,
-          roomCode: this.roomCode,
-          state,
-        } satisfies HostBroadcastMessage);
-      } else {
-        conn.send({
-          type: 'STATE_SYNC',
-          state,
-        } satisfies HostBroadcastMessage);
-      }
+      conn.send({
+        type: 'STATE_SYNC',
+        assignedSeatIndex: seatIdx,
+        roomCode: this.roomCode,
+        state,
+      } satisfies HostBroadcastMessage);
     });
   }
 

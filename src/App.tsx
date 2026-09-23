@@ -19,6 +19,7 @@ import { soundFX } from './utils/soundEffects';
 import {
   ClientActionMessage,
   mpManager,
+  NetworkFlightEvent,
   SyncedTableState,
 } from './utils/multiplayerManager';
 import { PoolTableStage } from './components/PoolTableStage';
@@ -39,7 +40,7 @@ const INITIAL_PLAYERS_META: Array<{
 }> = [
   {
     id: 'player-0',
-    name: 'YOU',
+    name: 'Host',
     title: 'CHALLENGER',
     seat: 'bottom',
     avatarUrl:
@@ -128,8 +129,10 @@ export function App() {
   const [winner, setWinner] = useState<Player | null>(null);
 
   // Latest flight/effect refs for syncing to peers
-  const latestFlightRef = useRef<CardFlight | null>(null);
+  const latestFlightRef = useRef<NetworkFlightEvent | null>(null);
   const latestEffectRef = useRef<TableSpecialEffect | null>(null);
+  const seenFlightIdRef = useRef<string>('');
+  const seenEffectIdRef = useRef<string>('');
   const aiTimerRef = useRef<number | null>(null);
 
   const triggerTableEffect = useCallback(
@@ -137,6 +140,7 @@ export function App() {
       const id = `fx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const fullFx: TableSpecialEffect = { ...effect, id };
       latestEffectRef.current = fullFx;
+      seenEffectIdRef.current = id;
       setEffects((prev) => [...prev, fullFx]);
       window.setTimeout(() => {
         setEffects((prev) => prev.filter((e) => e.id !== id));
@@ -145,25 +149,43 @@ export function App() {
     []
   );
 
-  const spawnCardFlight = useCallback(
+  const spawnNetworkFlight = useCallback(
     (
       card: UnoCardData,
-      fromSeat: SeatPosition | 'draw_pile',
-      toSeat: SeatPosition | 'discard_pile',
+      fromSeatIndex: number | 'draw_pile',
+      toSeatIndex: number | 'discard_pile',
+      viewerSeatIndex: number,
       faceUp: boolean,
       delayMs = 0
     ) => {
       const id = `flight-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const flight: CardFlight = {
+      const netEvent: NetworkFlightEvent = {
         id,
         card,
-        fromSeat,
-        toSeat,
+        fromSeatIndex,
+        toSeatIndex,
         faceUp,
         delayMs,
       };
-      latestFlightRef.current = flight;
-      setFlights((prev) => [...prev, flight]);
+      latestFlightRef.current = netEvent;
+      seenFlightIdRef.current = id;
+
+      const localFlight: CardFlight = {
+        id,
+        card,
+        fromSeat:
+          fromSeatIndex === 'draw_pile'
+            ? 'draw_pile'
+            : getRelativeSeat(fromSeatIndex, viewerSeatIndex),
+        toSeat:
+          toSeatIndex === 'discard_pile'
+            ? 'discard_pile'
+            : getRelativeSeat(toSeatIndex, viewerSeatIndex),
+        faceUp,
+        delayMs,
+      };
+
+      setFlights((prev) => [...prev, localFlight]);
       window.setTimeout(() => {
         setFlights((prev) => prev.filter((f) => f.id !== id));
       }, 480 + delayMs);
@@ -314,11 +336,11 @@ export function App() {
         discardOffsetY: (Math.random() - 0.5) * 9,
       };
 
-      const relativeFromSeat = getRelativeSeat(playerIdx, mySeatIndex);
-      spawnCardFlight(
+      spawnNetworkFlight(
         playedCardWithMeta,
-        relativeFromSeat,
+        playerIdx,
         'discard_pile',
+        mySeatIndex,
         true
       );
 
@@ -475,7 +497,7 @@ export function App() {
       pendingPenalty,
       sevenZeroRule,
       mySeatIndex,
-      spawnCardFlight,
+      spawnNetworkFlight,
       triggerTableEffect,
       getNextPlayerIndex,
     ]
@@ -492,12 +514,12 @@ export function App() {
 
       soundFX.playCardDraw();
 
-      const relTargetSeat = getRelativeSeat(playerIdx, mySeatIndex);
       drawn.slice(0, 6).forEach((c, i) => {
-        spawnCardFlight(
+        spawnNetworkFlight(
           c,
           'draw_pile',
-          relTargetSeat,
+          playerIdx,
+          mySeatIndex,
           playerIdx === mySeatIndex,
           i * 90
         );
@@ -508,7 +530,7 @@ export function App() {
         triggerTableEffect({
           type: 'draw_penalty',
           color: activeColor,
-          targetSeat: relTargetSeat,
+          targetSeat: getRelativeSeat(playerIdx, mySeatIndex),
           penaltyAmount: drawCount,
           label: `${targetPlayer.name.toUpperCase()} DREW +${drawCount}`,
         });
@@ -536,7 +558,7 @@ export function App() {
       direction,
       mySeatIndex,
       pullCardsFromDeck,
-      spawnCardFlight,
+      spawnNetworkFlight,
       triggerTableEffect,
       getNextPlayerIndex,
     ]
@@ -582,6 +604,9 @@ export function App() {
     mpManager.onStatusChange = (txt) => setMpStatusText(txt);
 
     mpManager.onClientJoined = (seatIdx, friendName) => {
+      if (aiTimerRef.current && turnIndex === seatIdx) {
+        window.clearTimeout(aiTimerRef.current);
+      }
       setConnectedFriendsCount(mpManager.getConnectedPeerCount());
       setPlayers((prev) =>
         prev.map((p, idx) =>
@@ -634,9 +659,7 @@ export function App() {
     };
 
     mpManager.onStateReceived = (state, assignedSeat) => {
-      if (typeof assignedSeat === 'number') {
-        setMySeatIndex(assignedSeat);
-      }
+      setMySeatIndex(assignedSeat);
       setMode(state.mode);
       setSevenZeroRule(state.sevenZeroRule);
       setPlayers(
@@ -653,6 +676,48 @@ export function App() {
       setSkippedPlayerId(state.skippedPlayerId);
       setAwaitingSevenSwapForSeat(state.awaitingSevenSwapForSeat);
       setWinner(state.winner);
+
+      // Replay any new card flight from Host on this viewer's screen using relative seat coordinates
+      if (
+        state.latestFlight &&
+        state.latestFlight.id !== seenFlightIdRef.current
+      ) {
+        seenFlightIdRef.current = state.latestFlight.id;
+        const nf = state.latestFlight;
+        const localFlight: CardFlight = {
+          id: nf.id,
+          card: nf.card,
+          fromSeat:
+            nf.fromSeatIndex === 'draw_pile'
+              ? 'draw_pile'
+              : getRelativeSeat(nf.fromSeatIndex, assignedSeat),
+          toSeat:
+            nf.toSeatIndex === 'discard_pile'
+              ? 'discard_pile'
+              : getRelativeSeat(nf.toSeatIndex, assignedSeat),
+          faceUp:
+            nf.toSeatIndex === 'discard_pile' ||
+            nf.toSeatIndex === assignedSeat,
+          delayMs: nf.delayMs,
+        };
+        soundFX.playCardPlay();
+        setFlights((prev) => [...prev, localFlight]);
+        window.setTimeout(() => {
+          setFlights((prev) => prev.filter((f) => f.id !== localFlight.id));
+        }, 520);
+      }
+
+      if (
+        state.latestEffect &&
+        state.latestEffect.id !== seenEffectIdRef.current
+      ) {
+        seenEffectIdRef.current = state.latestEffect.id;
+        const fx = state.latestEffect;
+        setEffects((prev) => [...prev, fx]);
+        window.setTimeout(() => {
+          setEffects((prev) => prev.filter((e) => e.id !== fx.id));
+        }, 1100);
+      }
     };
   }, [
     players,
