@@ -42,26 +42,38 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
   /**
    * Exact responsive geometry so 100% of cards ALWAYS fit within the screen
-   * at 100% default browser zoom (no horizontal clipping or off-screen overflow):
-   * - Card width for `md` is 102px, `lg` is 116px.
-   * - Each overlap card adds `(cardWidthPx + overlapMarginPx)` to total width.
-   * - Therefore: `overlapMarginPx = ((availableW - totalGroupGaps - groupCount * cardWidthPx) / totalOverlaps) - cardWidthPx`.
+   * on both Desktop (100% zoom) and Mobile phones (Portrait & Landscape):
+   * - Card width: `sm` is 68px (mobile), `md` is 102px, `lg` is 116px.
    */
+  const isMobileViewport = winWidth <= 768;
   const useCompactCardSize = totalCards >= 11 || winWidth < 1360;
-  const cardWidthPx = useCompactCardSize ? 102 : 116;
+  const cardRenderSize: 'sm' | 'md' | 'lg' = isMobileViewport
+    ? 'sm'
+    : useCompactCardSize
+    ? 'md'
+    : 'lg';
+  const cardWidthPx =
+    cardRenderSize === 'sm' ? 68 : cardRenderSize === 'md' ? 102 : 116;
 
-  // Leave generous horizontal safety margin (80px total) so even rotated edge cards stay 100% inside the 100% zoom viewport
-  const availableW = Math.max(340, winWidth - 84);
+  // Leave horizontal safety margin so rotated edge cards stay 100% inside the viewport
+  const availableW = isMobileViewport
+    ? Math.max(280, winWidth - 18)
+    : Math.max(340, winWidth - 84);
 
   // Gap between color groups (Red | Blue | Green | Yellow | Wild)
-  const groupGapPx =
-    totalCards <= 9
-      ? 22
+  const groupGapPx = isMobileViewport
+    ? totalCards <= 8
+      ? 8
       : totalCards <= 14
-      ? 16
-      : totalCards <= 19
-      ? 12
-      : 9;
+      ? 5
+      : 3
+    : totalCards <= 9
+    ? 22
+    : totalCards <= 14
+    ? 16
+    : totalCards <= 19
+    ? 12
+    : 9;
 
   const totalGroupGapsWidth = Math.max(0, groupCount - 1) * groupGapPx;
   const totalOverlapsCount = Math.max(1, totalCards - groupCount);
@@ -74,16 +86,21 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   // Convert step advance to CSS `margin-left`: `margin = step - cardWidthPx`
   const rawNegativeMargin = Math.floor(allowedStepPerOverlap - cardWidthPx);
 
-  // Keep at least 24px of each card's left edge visible so corner numbers/symbols are always readable
-  const minOverlapMargin = -(cardWidthPx - 24);
-  const maxOverlapMargin = useCompactCardSize ? -38 : -36;
+  // Keep enough of each card's left edge visible so corner numbers/symbols are always readable
+  const minVisibleStrip = isMobileViewport ? 16 : 24;
+  const minOverlapMargin = -(cardWidthPx - minVisibleStrip);
+  const maxOverlapMargin = isMobileViewport
+    ? -22
+    : useCompactCardSize
+    ? -38
+    : -36;
   const dynamicOverlapMarginPx = Math.max(
     minOverlapMargin,
     Math.min(maxOverlapMargin, rawNegativeMargin)
   );
 
-  // Compute exact resulting row width; if still wider than `availableW` (e.g., 22-24 cards on a small laptop),
-  // scale the row down proportionally so 100% of cards are guaranteed visible on screen at 100% zoom!
+  // Compute exact resulting row width; if still wider than `availableW` (e.g., 20-24 cards on a compact mobile screen),
+  // scale the row down proportionally so 100% of cards are guaranteed visible on screen!
   const estimatedRowWidth =
     totalGroupGapsWidth +
     groupCount * cardWidthPx +
@@ -91,7 +108,10 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
   const rowAutoScale =
     estimatedRowWidth > availableW
-      ? Math.max(0.68, (availableW - 16) / estimatedRowWidth)
+      ? Math.max(
+          isMobileViewport ? 0.52 : 0.68,
+          (availableW - (isMobileViewport ? 8 : 16)) / estimatedRowWidth
+        )
       : 1;
 
   let runningCardIndex = 0;
@@ -128,7 +148,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   initial={{ opacity: 0, y: 24, scale: 0.9 }}
                   animate={{
                     opacity: 1,
-                    y: Math.abs(normalizedGroupOffset) * 5,
+                    y:
+                      Math.abs(normalizedGroupOffset) *
+                      (isMobileViewport ? 2 : 5),
                     scale: 1,
                   }}
                   exit={{ opacity: 0, scale: 0.85, y: 15 }}
@@ -152,9 +174,15 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                           : 0;
 
                       const fanAngle =
-                        normalizedPos * (totalCards > 16 ? 5.5 : 8.5);
+                        normalizedPos *
+                        (isMobileViewport
+                          ? 4.2
+                          : totalCards > 16
+                          ? 5.5
+                          : 8.5);
                       const archDrop =
-                        Math.pow(Math.abs(normalizedPos), 1.6) * 8;
+                        Math.pow(Math.abs(normalizedPos), 1.6) *
+                        (isMobileViewport ? 4 : 8);
 
                       const isPlayable =
                         isPlayerTurn &&
@@ -179,11 +207,17 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                           animate={{
                             opacity: 1,
                             y: isHovered
-                              ? -38
+                              ? isMobileViewport
+                                ? -22
+                                : -38
                               : isPlayable
-                              ? archDrop - 6
+                              ? archDrop - (isMobileViewport ? 4 : 6)
                               : archDrop,
-                            scale: isHovered ? 1.16 : 1,
+                            scale: isHovered
+                              ? isMobileViewport
+                                ? 1.1
+                                : 1.16
+                              : 1,
                             rotate: isHovered ? 0 : fanAngle,
                           }}
                           exit={{
@@ -207,8 +241,10 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                             zIndex: isHovered ? 200 : 20 + globalIndex,
                           }}
                           onMouseEnter={() => {
-                            setHoveredCardId(card.id);
-                            soundFX.playCardHover();
+                            if (!isMobileViewport) {
+                              setHoveredCardId(card.id);
+                              soundFX.playCardHover();
+                            }
                           }}
                           onMouseLeave={() => {
                             setHoveredCardId((prev) =>
@@ -218,10 +254,11 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                         >
                           <UnoCard
                             card={card}
-                            size={useCompactCardSize ? 'md' : 'lg'}
+                            size={cardRenderSize}
                             playable={isPlayable}
                             dimmed={isPlayerTurn && !isPlayable}
                             onClick={() => {
+                              setHoveredCardId(null);
                               if (isPlayable) {
                                 onPlayCard(card);
                               }

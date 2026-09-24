@@ -3245,6 +3245,287 @@ body,
   }
 }
 
+/* ==================================================
+   COMPREHENSIVE MOBILE OPTIMIZATION (PORTRAIT & LANDSCAPE)
+   ================================================== */
+
+.uno-billiards-app-root {
+  height: 100dvh;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  /* 1. Home Screen Mobile Optimization */
+  .nm-home-backdrop {
+    align-items: flex-start;
+    padding: 12px 10px 36px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nm-showcase-shell {
+    grid-template-columns: 1fr;
+    padding: 14px;
+    gap: 14px;
+    border-radius: 20px;
+  }
+
+  .nm-title-main,
+  .nm-title-bloom {
+    font-size: clamp(34px, 10vw, 48px);
+    padding: 4px 12px;
+  }
+
+  .nm-physical-fan-stage {
+    height: 118px;
+    transform: scale(0.76);
+    margin: -8px 0;
+  }
+
+  .nm-rule-badges-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .nm-mini-feature {
+    padding: 7px 9px;
+  }
+
+  .nm-glass-card {
+    padding: 15px;
+    gap: 11px;
+    border-radius: 18px;
+  }
+
+  /* 2. Mobile 3D Billiards Table & Seats */
+  .room-overhead-lamp-fixture {
+    width: 240px;
+    transform: translateX(-50%) scale(0.75);
+  }
+
+  .pool-table-3d-rig {
+    width: 96vw;
+    height: 62dvh;
+    margin-top: -54px;
+    transform: rotateX(14deg) scale(0.98);
+  }
+
+  .opponent-table-station.seat-top {
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%) scale(0.75);
+    transform-origin: top center;
+  }
+
+  .opponent-table-station.seat-left {
+    left: 4px;
+    top: 38%;
+    transform: translateY(-50%) scale(0.7);
+    transform-origin: left center;
+  }
+
+  .opponent-table-station.seat-right {
+    right: 4px;
+    top: 38%;
+    transform: translateY(-50%) scale(0.7);
+    transform-origin: right center;
+  }
+
+  .center-table-focal-zone {
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.64);
+  }
+
+  .felt-inlay-header {
+    display: none;
+  }
+
+  /* 3. Mobile Card Dimensions (matches cardWidthPx = 68 in PlayerHand.tsx) */
+  .uno-physical-card.size-sm {
+    width: 68px;
+    height: 100px;
+    border-radius: 9px;
+    padding: 3.5px;
+  }
+
+  /* 4. Mobile Top HUD Bar */
+  .hud-top-minimal-bar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .hud-top-left-tag {
+    padding: 4px 9px;
+    font-size: 9.5px;
+    letter-spacing: 1px;
+    gap: 5px;
+  }
+
+  .hud-top-center-pills {
+    gap: 4px;
+  }
+
+  .hud-mode-pill,
+  .hud-rule-pill {
+    padding: 4px 8px;
+    font-size: 9.5px;
+    letter-spacing: 1px;
+    gap: 4px;
+  }
+
+  .mode-badge-prefix {
+    display: none;
+  }
+
+  .hud-icon-btn,
+  .hud-exit-bracket-btn {
+    height: 28px;
+    padding: 0 9px;
+    font-size: 10.5px;
+  }
+
+  /* 5. Mobile Bottom HUD Bar & Turn Banner */
+  .hud-bottom-table-bar {
+    bottom: 122px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .table-integrated-turn-banner {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    padding: 2px 10px;
+    gap: 8px;
+  }
+
+  .turn-wing {
+    width: 20px;
+  }
+
+  .turn-indicator-label {
+    font-size: 12px;
+    letter-spacing: 1.8px;
+  }
+
+  .hud-bottom-left-meta,
+  .hud-bottom-right-controls {
+    gap: 6px;
+  }
+
+  .your-player-name-pill {
+    padding: 4px 9px;
+    font-size: 10.5px;
+    gap: 5px;
+  }
+
+  .your-pill-avatar {
+    width: 18px;
+    height: 18px;
+  }
+
+  .your-cards-counter-pill {
+    padding: 4px 10px;
+    gap: 5px;
+  }
+
+  .counter-caption {
+    font-size: 10px;
+  }
+
+  .counter-value {
+    font-size: 13px;
+  }
+
+  .table-action-btn {
+    height: 34px;
+    padding: 0 13px;
+    font-size: 11px;
+    border-radius: 9px;
+  }
+
+  /* 6. Mobile Foreground Hand Tray */
+  .player-foreground-hand-stage {
+    bottom: 4px;
+    height: 138px;
+  }
+
+  .player-hand-scroll-viewport {
+    padding: 34px 6px 6px;
+  }
+
+  /* 7. Mobile Modals (Online Lounge, Wild Color Picker, Victory) */
+  .online-lounge-modal-card,
+  .wild-color-modal-card,
+  .victory-modal-card {
+    width: 94vw !important;
+    max-width: 400px !important;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding: 16px !important;
+  }
+
+  .lounge-split-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile Landscape Optimization (Phones rotated horizontally) */
+@media (max-height: 540px) {
+  .pool-table-3d-rig {
+    width: 92vw;
+    height: 72dvh;
+    margin-top: -20px;
+    transform: rotateX(18deg) scale(0.95);
+  }
+
+  .opponent-table-station.seat-top {
+    top: 6px;
+    transform: translateX(-50%) scale(0.7);
+  }
+
+  .opponent-table-station.seat-left {
+    left: 12px;
+    top: 44%;
+    transform: translateY(-50%) scale(0.7);
+  }
+
+  .opponent-table-station.seat-right {
+    right: 12px;
+    top: 44%;
+    transform: translateY(-50%) scale(0.7);
+  }
+
+  .center-table-focal-zone {
+    top: 48%;
+    transform: translate(-50%, -50%) scale(0.64);
+  }
+
+  .hud-bottom-table-bar {
+    bottom: 104px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .player-foreground-hand-stage {
+    bottom: 2px;
+    height: 118px;
+  }
+
+  .player-hand-scroll-viewport {
+    padding: 26px 10px 4px;
+  }
+}
+
+
 
 
 
