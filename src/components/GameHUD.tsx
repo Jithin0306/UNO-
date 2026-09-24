@@ -25,6 +25,7 @@ import {
   compressAvatarImageFile,
   DEFAULT_HUMAN_AVATAR,
 } from '../utils/avatarImage';
+import { MusicControls } from './MusicControls';
 
 interface GameHUDProps {
   mode: GameMode;
@@ -227,14 +228,16 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         </div>
 
-        {/* Top-Right: Mute & [ Exit ] */}
+        {/* Top-Right: Background Music Controls, SFX Mute & [ Exit ] */}
         <div className="hud-top-right-actions">
+          <MusicControls compact />
+
           <button
             type="button"
             className="hud-icon-btn"
             onClick={onToggleMute}
-            aria-label={muted ? 'Unmute Audio' : 'Mute Audio'}
-            title={muted ? 'Unmute Table Audio' : 'Mute Table Audio'}
+            aria-label={muted ? 'Unmute Card SFX' : 'Mute Card SFX'}
+            title={muted ? 'Unmute Card SFX' : 'Mute Card SFX'}
           >
             {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>

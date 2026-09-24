@@ -24,6 +24,7 @@ import {
   compressAvatarImageFile,
   DEFAULT_HUMAN_AVATAR,
 } from '../utils/avatarImage';
+import { MusicControls } from './MusicControls';
 
 interface HomeScreenProps {
   savedName: string;
@@ -198,6 +199,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Translucent Radial Vignette so the 3D Emerald Billiards Table Shines Through */}
       <div className="nm-aura-crimson" />
       <div className="nm-aura-emerald" />
+
+      {/* Top-Right Floating Copyright-Free Background Music Controls */}
+      <div className="nm-home-top-music-bar">
+        <MusicControls />
+      </div>
 
       <motion.div
         className="nm-showcase-shell"
