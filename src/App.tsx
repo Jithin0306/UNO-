@@ -133,7 +133,15 @@ export function App() {
   const [pendingPenalty, setPendingPenalty] = useState<number>(0);
   const [skippedPlayerId, setSkippedPlayerId] = useState<string | null>(null);
 
-  // Multiplayer state
+  // Multiplayer & Player Identity state
+  const [myPlayerName, setMyPlayerName] = useState<string>(() => {
+    try {
+      return localStorage.getItem('uno_player_name') || 'Player 1';
+    } catch {
+      return 'Player 1';
+    }
+  });
+  const [initialInviteCode, setInitialInviteCode] = useState<string>('');
   const [mpRole, setMpRole] = useState<'offline' | 'host' | 'client'>('offline');
   const [roomCode, setRoomCode] = useState<string>('');
   const [mySeatIndex, setMySeatIndex] = useState<number>(0);
@@ -233,7 +241,12 @@ export function App() {
             : true;
           return {
             ...meta,
-            name: existing ? existing.name : meta.name,
+            name:
+              idx === 0
+                ? myPlayerName
+                : existing
+                ? existing.name
+                : meta.name,
             title: existing ? existing.title : meta.title,
             isAI: existing ? existing.isAI : meta.isAI,
             isActive: idx === 0 ? true : isActive,
@@ -257,21 +270,28 @@ export function App() {
       setSkippedPlayerId(null);
       setWinner(null);
     },
-    [mode]
+    [mode, myPlayerName]
   );
 
   useEffect(() => {
-    // Start in 1v1 mode by default (Host vs Top Opponent Nyx) so the table isn't crowded with 3 bots unless requested!
     startNewMatch(mode, [true, false, true, false]);
 
     const params = new URLSearchParams(window.location.search);
     const inviteRoom = params.get('room');
     if (inviteRoom && inviteRoom.trim()) {
+      const cleanRoom = inviteRoom.trim().toUpperCase();
+      setInitialInviteCode(cleanRoom);
+      let savedName = '';
+      try {
+        savedName = localStorage.getItem('uno_player_name') || '';
+      } catch {}
+      const joinName = savedName || `Player_${Math.floor(10 + Math.random() * 89)}`;
+      setMyPlayerName(joinName);
       mpManager
-        .joinRoom(inviteRoom.trim(), 'Friend')
+        .joinRoom(cleanRoom, joinName)
         .then(() => {
           setMpRole('client');
-          setRoomCode(inviteRoom.trim().toUpperCase());
+          setRoomCode(cleanRoom);
         })
         .catch(() => {});
     }
@@ -848,6 +868,15 @@ export function App() {
         if (awaitingSevenSwapForSeat === msg.seatIndex) {
           executeSevenSwapForSeat(msg.seatIndex, msg.targetPlayerId);
         }
+      } else if (msg.type === 'UPDATE_NAME') {
+        const cleanName = msg.playerName.trim();
+        if (cleanName) {
+          setPlayers((prev) =>
+            prev.map((p, idx) =>
+              idx === msg.seatIndex ? { ...p, name: cleanName } : p
+            )
+          );
+        }
       }
     };
 
@@ -1161,6 +1190,7 @@ export function App() {
       <GameHUD
         mode={mode}
         sevenZeroRule={sevenZeroRule}
+        myPlayerName={myPlayer.name || myPlayerName}
         activePlayer={activePlayer}
         playerCardCount={myPlayer.hand.length}
         activeBotCount={activeBotCount}
@@ -1183,8 +1213,30 @@ export function App() {
         }
         mpRole={mpRole}
         roomCode={roomCode}
+        initialInviteCode={initialInviteCode}
         connectedFriendsCount={connectedFriendsCount}
         mpStatusText={mpStatusText}
+        onUpdateMyName={(newName) => {
+          const clean = newName.trim();
+          if (!clean) return;
+          setMyPlayerName(clean);
+          try {
+            localStorage.setItem('uno_player_name', clean);
+          } catch {}
+          if (mpRole === 'client') {
+            mpManager.sendActionToHost({
+              type: 'UPDATE_NAME',
+              seatIndex: mySeatIndex,
+              playerName: clean,
+            });
+          } else {
+            setPlayers((prev) =>
+              prev.map((p, idx) =>
+                idx === mySeatIndex ? { ...p, name: clean } : p
+              )
+            );
+          }
+        }}
         onHostOnlineRoom={async (hostName) => {
           const code = await mpManager.startHosting(hostName);
           setMpRole('host');

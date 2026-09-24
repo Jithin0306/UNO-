@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Volume2,
@@ -9,12 +9,14 @@ import {
   Check,
   Wifi,
   Bot,
+  Edit3,
 } from 'lucide-react';
 import { ActiveColor, GameMode, Player } from '../types/uno';
 
 interface GameHUDProps {
   mode: GameMode;
   sevenZeroRule: boolean;
+  myPlayerName: string;
   activePlayer: Player;
   playerCardCount: number;
   activeBotCount: number;
@@ -27,8 +29,10 @@ interface GameHUDProps {
   winner: Player | null;
   mpRole: 'offline' | 'host' | 'client';
   roomCode: string;
+  initialInviteCode: string;
   connectedFriendsCount: number;
   mpStatusText: string;
+  onUpdateMyName: (newName: string) => void;
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
   onLeaveOnlineRoom: () => void;
@@ -45,6 +49,7 @@ interface GameHUDProps {
 export const GameHUD: React.FC<GameHUDProps> = ({
   mode,
   sevenZeroRule,
+  myPlayerName,
   activePlayer,
   playerCardCount,
   activeBotCount,
@@ -57,8 +62,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   winner,
   mpRole,
   roomCode,
+  initialInviteCode,
   connectedFriendsCount,
   mpStatusText,
+  onUpdateMyName,
   onHostOnlineRoom,
   onJoinOnlineRoom,
   onLeaveOnlineRoom,
@@ -72,16 +79,30 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onNewMatch,
 }) => {
   const [showRoomModal, setShowRoomModal] = useState(false);
-  const [nickname, setNickname] = useState('Player');
+  const [nickname, setNickname] = useState(myPlayerName || '');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+
+  // When an invite link (?room=XXXXX) is opened, automatically pop open the modal with the code pre-filled so the friend enters their name!
+  useEffect(() => {
+    if (initialInviteCode) {
+      setJoinCodeInput(initialInviteCode.toUpperCase());
+      setShowRoomModal(true);
+    }
+  }, [initialInviteCode]);
+
+  useEffect(() => {
+    if (myPlayerName && myPlayerName !== 'Host' && myPlayerName !== 'Friend') {
+      setNickname(myPlayerName);
+    }
+  }, [myPlayerName]);
 
   const turnText =
     activeTotalPlayers < 2
       ? 'ADD A BOT OR INVITE A FRIEND'
       : isPlayerTurn
-      ? 'YOUR TURN'
+      ? `YOUR TURN (${myPlayerName.toUpperCase()})`
       : `${activePlayer.name.toUpperCase()}'S TURN`;
 
   const handleCopyInvite = () => {
@@ -90,6 +111,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     navigator.clipboard.writeText(url).catch(() => {});
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleNameChange = (val: string) => {
+    setNickname(val);
+    const trimmed = val.trim();
+    if (trimmed.length > 0) {
+      onUpdateMyName(trimmed);
+    }
   };
 
   return (
@@ -111,7 +140,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             {mpRole === 'host'
               ? `ROOM #${roomCode} (${connectedFriendsCount + 1} HUMAN)`
               : mpRole === 'client'
-              ? `JOINED #${roomCode}`
+              ? `JOINED #${roomCode} AS ${myPlayerName.toUpperCase()}`
               : 'PLAY WITH FRIENDS • ONLINE ROOM'}
           </span>
         </button>
@@ -119,7 +148,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         {/* Top-Center: Table Format (1v1 / 1v3 / No Bots) & Game Mode */}
         <div className="hud-top-center-pills">
           {mpRole !== 'client' && (
-            <div className="hud-bot-preset-group" title="Choose 1v1, 1v3, or No Bots (you can also click + ADD BOT on any seat)">
+            <div
+              className="hud-bot-preset-group"
+              title="Choose 1v1, 1v3, or No Bots (you can also click + ADD BOT on any seat)"
+            >
               <Bot size={13} className="bot-preset-icon" />
               <button
                 type="button"
@@ -204,22 +236,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* BOTTOM FOREGROUND CONTROLS INTEGRATED INTO THE TABLE */}
       <div className="hud-bottom-table-bar">
-        {/* Left: Your Cards Count & Hand Legend */}
+        {/* Left: Your Player Name Badge & Your Cards Count */}
         <div className="hud-bottom-left-meta">
+          <button
+            type="button"
+            className="your-player-name-pill"
+            onClick={() => setShowRoomModal(true)}
+            title="Click to change your display name"
+          >
+            <span className="your-name-tag">{myPlayerName}</span>
+            <Edit3 size={11} className="name-edit-icon" />
+          </button>
+
           <div className="your-cards-counter-pill">
             <span className="counter-caption">Your Cards:</span>
             <span className="counter-value">{playerCardCount}</span>
-          </div>
-          <div
-            className="sorting-order-micro-hint"
-            title="Hand automatically sorted by color group (Red → Blue → Green → Yellow → Wild), Numbers before Specials"
-          >
-            <span className="pip pip-red" />
-            <span className="pip pip-blue" />
-            <span className="pip pip-green" />
-            <span className="pip pip-yellow" />
-            <span className="pip pip-wild" />
-            <span className="hint-text">AUTO-SORTED</span>
           </div>
         </div>
 
@@ -272,7 +303,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       </div>
 
-      {/* ONLINE MULTIPLAYER FRIENDS LOUNGE MODAL */}
+      {/* ONLINE MULTIPLAYER FRIENDS LOUNGE & NAME MODAL */}
       <AnimatePresence>
         {showRoomModal && (
           <motion.div
@@ -293,7 +324,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <div className="lounge-modal-header">
                 <div className="lounge-title-group">
                   <Wifi size={16} className="gold-icon" />
-                  <h3>PRIVATE BILLIARDS LOUNGE • ONLINE P2P</h3>
+                  <h3>PRIVATE BILLIARDS LOUNGE • PLAYER & ROOM</h3>
                 </div>
                 <button
                   type="button"
@@ -304,21 +335,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </button>
               </div>
 
-              <p className="lounge-desc">
-                Hosting an online room automatically removes AI bots by default so
-                you can play pure <strong>1v1</strong> (or 3–4 player) with your
-                friends. You can also click <strong>+ ADD BOT</strong> on any empty
-                table seat at any time!
-              </p>
-
               <div className="lounge-input-group">
-                <label>YOUR TABLE NAME</label>
+                <label>YOUR DISPLAY NAME (SHOWN TO ALL FRIENDS AT THE TABLE)</label>
                 <input
                   type="text"
                   value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Enter your display name..."
-                  maxLength={14}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="Enter your name (e.g. Jithin, Rahul)..."
+                  maxLength={16}
+                  autoFocus
                 />
               </div>
 
@@ -333,9 +358,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       className="lounge-primary-btn"
                       disabled={isBusy}
                       onClick={async () => {
+                        const finalName = nickname.trim() || 'Host';
+                        onUpdateMyName(finalName);
                         setIsBusy(true);
                         try {
-                          await onHostOnlineRoom(nickname || 'Host');
+                          await onHostOnlineRoom(finalName);
                         } finally {
                           setIsBusy(false);
                         }
@@ -355,7 +382,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       onChange={(e) =>
                         setJoinCodeInput(e.target.value.toUpperCase())
                       }
-                      placeholder="E.G. 804XK"
+                      placeholder="E.G. LUA2H"
                       maxLength={8}
                     />
                     <button
@@ -363,11 +390,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       className="lounge-secondary-btn"
                       disabled={isBusy || !joinCodeInput.trim()}
                       onClick={async () => {
+                        const finalName =
+                          nickname.trim() ||
+                          `Player_${Math.floor(10 + Math.random() * 89)}`;
+                        onUpdateMyName(finalName);
                         setIsBusy(true);
                         try {
                           await onJoinOnlineRoom(
                             joinCodeInput.trim(),
-                            nickname || 'Guest'
+                            finalName
                           );
                           setShowRoomModal(false);
                         } finally {
@@ -375,7 +406,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                         }
                       }}
                     >
-                      {isBusy ? 'JOINING...' : 'JOIN TABLE'}
+                      {isBusy ? 'JOINING...' : 'JOIN TABLE NOW'}
                     </button>
                   </div>
                 </div>
@@ -384,7 +415,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   <div className="session-code-banner">
                     <span className="session-label">ACTIVE ROOM CODE</span>
                     <span className="session-big-code">#{roomCode}</span>
-                    <span className="session-status-pill">{mpStatusText}</span>
+                    <span className="session-status-pill">
+                      PLAYING AS: {myPlayerName.toUpperCase()} • {mpStatusText}
+                    </span>
                   </div>
 
                   <div className="session-buttons-row">
@@ -397,6 +430,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       <span>
                         {copiedLink ? 'INVITE LINK COPIED!' : 'COPY INVITE LINK'}
                       </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="lounge-secondary-btn"
+                      onClick={() => setShowRoomModal(false)}
+                    >
+                      SAVE & RETURN
                     </button>
 
                     <button

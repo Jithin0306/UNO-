@@ -29,8 +29,47 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   // RED (numbers -> specials) | BLUE (numbers -> specials) | GREEN | YELLOW | WILD
   const colorGroups = groupSortedHandByColor(cards);
   const totalCards = cards.length;
+  const groupCount = colorGroups.length;
 
-  // Flatten while tracking global card index and group index so we can calculate natural fan arc + inter-group gaps
+  /**
+   * Dynamic responsive spacing so 20, 25, or 40+ cards fit comfortably inside the screen
+   * without overflowing horizontally or sinking off the bottom edge of the viewport:
+   * - Card width for `md`/`lg` is ~102px-116px.
+   * - We dynamically adjust `overlapMarginPx`, `groupGapPx`, and `cardSize` based on `totalCards`.
+   */
+  const useCompactCardSize = totalCards >= 16;
+  const cardWidthPx = useCompactCardSize ? 96 : 114;
+
+  // Available safe horizontal width on desktop/laptop (~88% of viewport width)
+  const viewportW =
+    typeof window !== 'undefined' ? Math.min(window.innerWidth * 0.92, 1680) : 1360;
+
+  // Gap between color groups (Red | Blue | Green | Yellow | Wild)
+  const groupGapPx =
+    totalCards <= 10
+      ? 26
+      : totalCards <= 16
+      ? 20
+      : totalCards <= 24
+      ? 16
+      : 13;
+
+  const totalGroupGapsWidth = Math.max(0, groupCount - 1) * groupGapPx;
+  const totalOverlapsCount = Math.max(1, totalCards - groupCount);
+
+  // Calculate ideal negative margin so the entire hand fits within `viewportW`
+  const rawRequiredStep =
+    (viewportW - totalGroupGapsWidth - groupCount * cardWidthPx) /
+    totalOverlapsCount;
+
+  // Clamp negative overlap so corner numbers/symbols always stay readable (min 22px visible strip per card)
+  const minOverlapMargin = -(cardWidthPx - 23);
+  const maxOverlapMargin = useCompactCardSize ? -34 : -36;
+  const dynamicOverlapMarginPx = Math.max(
+    minOverlapMargin,
+    Math.min(maxOverlapMargin, Math.floor(rawRequiredStep))
+  );
+
   let runningCardIndex = 0;
 
   return (
@@ -43,11 +82,13 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
       />
 
       <div className="player-hand-scroll-viewport">
-        <motion.div layout className="player-hand-groups-row">
+        <motion.div
+          layout
+          className="player-hand-groups-row"
+          style={{ gap: `${groupGapPx}px` }}
+        >
           <AnimatePresence initial={false} mode="popLayout">
             {colorGroups.map((group, groupIdx) => {
-              // Subtle group angle inflection so each color cluster fans naturally toward the center
-              const groupCount = colorGroups.length;
               const normalizedGroupOffset =
                 groupCount > 1 ? groupIdx / (groupCount - 1) - 0.5 : 0;
 
@@ -56,32 +97,36 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   layout
                   key={`color-group-${group.color}`}
                   className={`hand-color-cluster cluster-${group.color}`}
-                  initial={{ opacity: 0, y: 35, scale: 0.9 }}
+                  initial={{ opacity: 0, y: 24, scale: 0.9 }}
                   animate={{
                     opacity: 1,
-                    // Subtle vertical arch across color groups
-                    y: Math.abs(normalizedGroupOffset) * 12,
+                    // Clamp group vertical curve to max 6px so large hands never sink off-screen
+                    y: Math.abs(normalizedGroupOffset) * 6,
                     scale: 1,
                   }}
-                  exit={{ opacity: 0, scale: 0.85, y: 20 }}
+                  exit={{ opacity: 0, scale: 0.85, y: 15 }}
                   transition={{
                     type: 'spring',
                     stiffness: 290,
                     damping: 26,
                   }}
                 >
-                  {/* Subtle glowing color bar reflected onto the table surface under each color group (no ugly text labels) */}
-                  <div className={`cluster-felt-reflection reflection-${group.color}`} />
+                  {/* Subtle glowing color bar reflected onto the table surface under each color group */}
+                  <div
+                    className={`cluster-felt-reflection reflection-${group.color}`}
+                  />
 
                   <div className="cluster-cards-fan">
                     {group.cards.map((card, idxInGroup) => {
                       const globalIndex = runningCardIndex++;
-                      const centerIndex = (totalCards - 1) / 2;
-                      const offsetFromCenter = globalIndex - centerIndex;
+                      const normalizedPos =
+                        totalCards > 1
+                          ? (globalIndex / (totalCards - 1)) * 2 - 1 // Always in range [-1, +1] regardless of card count!
+                          : 0;
 
-                      // Natural fan angle & vertical curve
-                      const fanAngle = offsetFromCenter * 2.35;
-                      const archDrop = Math.pow(Math.abs(offsetFromCenter), 1.55) * 1.45;
+                      // Bounded fan angle (max ±9deg even with 35 cards!) and bounded arch drop (max 10px!)
+                      const fanAngle = normalizedPos * (totalCards > 18 ? 6.5 : 9.5);
+                      const archDrop = Math.pow(Math.abs(normalizedPos), 1.6) * 9;
 
                       const isPlayable =
                         isPlayerTurn &&
@@ -99,31 +144,33 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                           }`}
                           initial={{
                             opacity: 0,
-                            y: -90,
-                            scale: 0.65,
-                            rotate: -12,
+                            y: -70,
+                            scale: 0.7,
+                            rotate: -8,
                           }}
                           animate={{
                             opacity: 1,
                             y: isHovered ? -38 : isPlayable ? archDrop - 6 : archDrop,
-                            scale: isHovered ? 1.14 : 1,
-                            rotate: isHovered ? fanAngle * 0.2 : fanAngle,
+                            scale: isHovered ? 1.16 : 1,
+                            rotate: isHovered ? 0 : fanAngle,
                           }}
                           exit={{
                             opacity: 0,
-                            y: -140,
+                            y: -120,
                             scale: 0.82,
-                            rotate: 6,
-                            transition: { duration: 0.22 },
+                            rotate: 5,
+                            transition: { duration: 0.2 },
                           }}
                           transition={{
                             type: 'spring',
-                            stiffness: 350,
+                            stiffness: 360,
                             damping: 26,
-                            mass: 0.75,
+                            mass: 0.72,
                           }}
                           style={{
-                            zIndex: isHovered ? 120 : 20 + globalIndex,
+                            marginLeft:
+                              idxInGroup > 0 ? `${dynamicOverlapMarginPx}px` : '0px',
+                            zIndex: isHovered ? 200 : 20 + globalIndex,
                           }}
                           onMouseEnter={() => {
                             setHoveredCardId(card.id);
@@ -137,7 +184,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                         >
                           <UnoCard
                             card={card}
-                            size="lg"
+                            size={useCompactCardSize ? 'md' : 'lg'}
                             playable={isPlayable}
                             dimmed={isPlayerTurn && !isPlayable}
                             onClick={() => {

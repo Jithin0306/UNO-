@@ -57,6 +57,11 @@ export type ClientActionMessage =
       type: 'SWAP_SEVEN';
       seatIndex: number;
       targetPlayerId: string;
+    }
+  | {
+      type: 'UPDATE_NAME';
+      seatIndex: number;
+      playerName: string;
     };
 
 export interface HostBroadcastMessage {

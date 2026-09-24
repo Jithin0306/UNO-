@@ -1113,11 +1113,11 @@ body,
   display: none;
 }
 
-/* Noticeable, elegant visual gap (26px) between each Color Group */
 .player-hand-groups-row {
   display: flex;
   align-items: flex-end;
-  justify-content: center;
+  width: max-content;
+  margin: 0 auto;
   gap: 26px;
 }
 
@@ -2207,5 +2207,34 @@ body,
   color: #ffffff;
   transform: scale(1.1);
 }
+
+.your-player-name-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(5, 22, 14, 0.86);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: var(--gold-champagne);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.your-player-name-pill:hover {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.28);
+  color: #ffffff;
+}
+
+.name-edit-icon {
+  color: var(--gold-bright);
+  opacity: 0.85;
+}
+
 
 
