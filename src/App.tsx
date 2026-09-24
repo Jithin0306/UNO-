@@ -364,6 +364,7 @@ export function App() {
         awaitingSevenSwapForSeat,
         winner,
         turnSecondsLeft,
+        inLobby: showHomeScreen,
         latestFlight: latestFlightRef.current,
         latestEffect: latestEffectRef.current,
         latestElimination: latestEliminationRef.current,
@@ -372,6 +373,7 @@ export function App() {
     }
   }, [
     mpRole,
+    showHomeScreen,
     mode,
     sevenZeroRule,
     players,
@@ -1317,6 +1319,9 @@ export function App() {
       if (typeof state.turnSecondsLeft === 'number') {
         setTurnSecondsLeft(state.turnSecondsLeft);
       }
+      if (state.inLobby === false) {
+        setShowHomeScreen(false);
+      }
 
       if (
         state.latestElimination &&
@@ -2010,6 +2015,8 @@ export function App() {
         <HomeScreen
           savedName={myPlayer.name || myPlayerName}
           savedAvatarUrl={myPlayer.avatarUrl || myAvatarUrl}
+          players={players}
+          mySeatIndex={mySeatIndex}
           mode={mode}
           sevenZeroRule={sevenZeroRule}
           initialInviteCode={initialInviteCode}
@@ -2019,6 +2026,8 @@ export function App() {
           mpStatusText={mpStatusText}
           onSavePlayerName={handleSaveMyName}
           onSavePlayerAvatar={handleSaveMyAvatar}
+          onAddBotToSeat={handleAddBotToSeat}
+          onRemoveBotFromSeat={handleRemoveBotFromSeat}
           onStartQuickPlay={(preset) => {
             handleSetBotPreset(preset);
             setShowHomeScreen(false);
@@ -2061,6 +2070,9 @@ export function App() {
             setRoomCode(codeToJoin.toUpperCase());
           }}
           onEnterOnlineTable={() => {
+            if (mpRole === 'host') {
+              startNewMatch(mode);
+            }
             setShowHomeScreen(false);
           }}
         />

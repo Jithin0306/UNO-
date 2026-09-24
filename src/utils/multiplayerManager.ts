@@ -32,6 +32,7 @@ export interface SyncedTableState {
   awaitingSevenSwapForSeat: number | null;
   winner: Player | null;
   turnSecondsLeft?: number;
+  inLobby?: boolean;
   latestFlight?: NetworkFlightEvent | null;
   latestEffect?: TableSpecialEffect | null;
   latestElimination?: EliminationEvent | null;

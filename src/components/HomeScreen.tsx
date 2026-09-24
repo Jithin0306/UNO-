@@ -18,7 +18,7 @@ import {
   Repeat,
   Sparkles,
 } from 'lucide-react';
-import { GameMode, UnoCardData } from '../types/uno';
+import { GameMode, Player, UnoCardData } from '../types/uno';
 import { UnoCard } from './UnoCard';
 import {
   compressAvatarImageFile,
@@ -29,6 +29,8 @@ import { MusicControls } from './MusicControls';
 interface HomeScreenProps {
   savedName: string;
   savedAvatarUrl: string;
+  players: Player[];
+  mySeatIndex: number;
   mode: GameMode;
   sevenZeroRule: boolean;
   initialInviteCode: string;
@@ -38,6 +40,8 @@ interface HomeScreenProps {
   mpStatusText: string;
   onSavePlayerName: (name: string) => void;
   onSavePlayerAvatar: (avatarUrl: string) => void;
+  onAddBotToSeat: (seatIdx: number) => void;
+  onRemoveBotFromSeat: (seatIdx: number) => void;
   onStartQuickPlay: (preset: '1v1' | '1v3' | 'no_bots') => void;
   onToggleMode: () => void;
   onToggleSevenZero: () => void;
@@ -118,6 +122,8 @@ const SHOWCASE_FAN_CARDS: Array<{
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   savedName,
   savedAvatarUrl,
+  players,
+  mySeatIndex,
   mode,
   sevenZeroRule,
   initialInviteCode,
@@ -127,6 +133,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   mpStatusText,
   onSavePlayerName,
   onSavePlayerAvatar,
+  onAddBotToSeat,
+  onRemoveBotFromSeat,
   onStartQuickPlay,
   onToggleMode,
   onToggleSevenZero,
@@ -765,8 +773,129 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </span>
                     <div className="nm-lobby-code">#{roomCode}</div>
                     <div className="nm-lobby-meta">
-                      {mpStatusText} • {connectedFriendsCount + 1} Player(s)
+                      {mpStatusText} •{' '}
+                      {players.filter((p) => p.isActive).length} / 4 Table Seats
                       Ready
+                    </div>
+
+                    {/* LIVE LOBBY PLAYERS SPACE: SEE WHO JOINED YOUR LOBBY IN REAL TIME */}
+                    <div className="nm-lobby-roster-box">
+                      <div className="nm-lobby-roster-header">
+                        <span>PLAYERS IN LOBBY</span>
+                        <span className="nm-lobby-roster-count">
+                          {players.filter((p) => p.isActive && !p.isAI).length}{' '}
+                          HUMAN •{' '}
+                          {players.filter((p) => p.isActive && p.isAI).length}{' '}
+                          BOT
+                        </span>
+                      </div>
+
+                      <div className="nm-lobby-seats-grid">
+                        {players.map((p, idx) => {
+                          const isMe = idx === mySeatIndex;
+                          const isHostSeat = idx === 0;
+                          const isHumanJoined = p.isActive && !p.isAI;
+                          const isBotActive = p.isActive && p.isAI;
+
+                          return (
+                            <div
+                              key={p.id || idx}
+                              className={`nm-lobby-seat-row ${
+                                isHumanJoined
+                                  ? 'seat-human-joined'
+                                  : isBotActive
+                                  ? 'seat-bot-active'
+                                  : 'seat-waiting-empty'
+                              }`}
+                            >
+                              <div className="nm-lobby-seat-left">
+                                <div className="nm-lobby-seat-avatar-wrap">
+                                  {p.isActive ? (
+                                    <img
+                                      src={p.avatarUrl || DEFAULT_HUMAN_AVATAR}
+                                      alt={p.name}
+                                      className="nm-lobby-seat-avatar"
+                                    />
+                                  ) : (
+                                    <div className="nm-lobby-seat-empty-dot">
+                                      <span>{idx + 1}</span>
+                                    </div>
+                                  )}
+                                  {isHumanJoined && (
+                                    <span className="nm-lobby-online-indicator" />
+                                  )}
+                                </div>
+
+                                <div className="nm-lobby-seat-info">
+                                  <div className="nm-lobby-seat-name-line">
+                                    <span className="nm-lobby-seat-name">
+                                      {p.isActive
+                                        ? p.name
+                                        : `Seat ${idx + 1} — Open`}
+                                    </span>
+                                    {isMe && p.isActive && (
+                                      <span className="nm-lobby-you-tag">
+                                        YOU
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="nm-lobby-seat-sub">
+                                    {isHostSeat
+                                      ? 'Room Host'
+                                      : isHumanJoined
+                                      ? 'Joined Lobby via Room Code'
+                                      : isBotActive
+                                      ? 'AI Bot Opponent'
+                                      : 'Waiting for friend to join...'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="nm-lobby-seat-right">
+                                {isHostSeat ? (
+                                  <span className="nm-lobby-badge badge-host">
+                                    👑 HOST
+                                  </span>
+                                ) : isHumanJoined ? (
+                                  <span className="nm-lobby-badge badge-joined">
+                                    ● JOINED
+                                  </span>
+                                ) : isBotActive ? (
+                                  <div className="nm-lobby-bot-actions">
+                                    <span className="nm-lobby-badge badge-bot">
+                                      🤖 BOT
+                                    </span>
+                                    {mpRole === 'host' && (
+                                      <button
+                                        type="button"
+                                        className="nm-lobby-mini-seat-btn remove"
+                                        onClick={() => onRemoveBotFromSeat(idx)}
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="nm-lobby-bot-actions">
+                                    <span className="nm-lobby-badge badge-waiting">
+                                      WAITING...
+                                    </span>
+                                    {mpRole === 'host' && (
+                                      <button
+                                        type="button"
+                                        className="nm-lobby-mini-seat-btn add"
+                                        onClick={() => onAddBotToSeat(idx)}
+                                      >
+                                        + BOT
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="nm-lobby-actions">
