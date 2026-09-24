@@ -1,25 +1,58 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserPlus, X } from 'lucide-react';
 import { Player } from '../types/uno';
 import { UnoCardBack } from './UnoCard';
 
 interface OpponentSeatProps {
   player: Player;
+  seatIndex: number;
   isActiveTurn: boolean;
   isSkipped?: boolean;
   selectableForSwap?: boolean;
+  canManageBots?: boolean;
   onSelectForSwap?: (playerId: string) => void;
+  onAddBotToSeat?: (seatIndex: number) => void;
+  onRemoveBotFromSeat?: (seatIndex: number) => void;
 }
 
 export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   player,
+  seatIndex,
   isActiveTurn,
   isSkipped = false,
   selectableForSwap = false,
+  canManageBots = false,
   onSelectForSwap,
+  onAddBotToSeat,
+  onRemoveBotFromSeat,
 }) => {
+  // If this seat is currently empty (no Bot and no Online Friend)
+  if (!player.isActive) {
+    return (
+      <div
+        className={`opponent-table-station seat-${player.seat} is-empty-seat`}
+      >
+        {canManageBots ? (
+          <button
+            type="button"
+            className="empty-seat-add-bot-btn"
+            onClick={() => onAddBotToSeat?.(seatIndex)}
+            title={`Add AI Bot (${player.name}) to this seat`}
+          >
+            <UserPlus size={13} className="add-bot-icon" />
+            <span>+ ADD BOT</span>
+          </button>
+        ) : (
+          <div className="empty-seat-waiting-pill">
+            <span>OPEN SEAT</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const cardCount = player.hand.length;
-  // Cap visual fan to 10 backs so large penalties remain clean while showing accurate count
   const visibleFanCount = Math.min(cardCount, 10);
 
   return (
@@ -63,10 +96,27 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             ) : cardCount === 1 ? (
               <span className="status-uno-alert">UNO!</span>
             ) : (
-              <span className="status-role">{player.title}</span>
+              <span className="status-role">
+                {player.isAI ? 'BOT' : 'ONLINE PLAYER'}
+              </span>
             )}
           </div>
         </div>
+
+        {/* Manual Remove Bot button for Host/Local player */}
+        {canManageBots && player.isAI && !selectableForSwap && (
+          <button
+            type="button"
+            className="remove-bot-seat-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveBotFromSeat?.(seatIndex);
+            }}
+            title={`Remove ${player.name} Bot from table`}
+          >
+            <X size={12} />
+          </button>
+        )}
 
         {selectableForSwap && (
           <div className="swap-target-cta">SWAP HAND (7)</div>

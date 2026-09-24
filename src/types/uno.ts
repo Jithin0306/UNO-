@@ -45,6 +45,7 @@ export interface Player {
   accentColor: string;
   hand: UnoCardData[];
   isAI: boolean;
+  isActive: boolean;
   calledUno: boolean;
 }
 

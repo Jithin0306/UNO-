@@ -82,16 +82,41 @@ const INITIAL_PLAYERS_META: Array<{
 
 const SEAT_ORDER: SeatPosition[] = ['bottom', 'left', 'top', 'right'];
 
-/**
- * Maps an absolute seat index (0..3) to a relative screen seat ('bottom' | 'left' | 'top' | 'right')
- * from the perspective of `viewerSeatIndex` so every online player sees their own hand at the bottom.
- */
 function getRelativeSeat(
   targetSeatIndex: number,
   viewerSeatIndex: number
 ): SeatPosition {
   const offset = (((targetSeatIndex - viewerSeatIndex) % 4) + 4) % 4;
   return SEAT_ORDER[offset];
+}
+
+/**
+ * Steps through ONLY active seats (`p.isActive === true`) in direction `dir` (`1` or `-1`).
+ */
+function getNextActivePlayerIndex(
+  currentIndex: number,
+  dir: 1 | -1,
+  steps: number,
+  playerList: Player[]
+): number {
+  const activeIndices: number[] = [];
+  playerList.forEach((p, idx) => {
+    if (p.isActive) activeIndices.push(idx);
+  });
+
+  if (activeIndices.length <= 1) {
+    return activeIndices[0] ?? 0;
+  }
+
+  let posInActive = activeIndices.indexOf(currentIndex);
+  if (posInActive === -1) {
+    posInActive = 0;
+  }
+
+  const totalActive = activeIndices.length;
+  const nextPos =
+    (((posInActive + dir * steps) % totalActive) + totalActive) % totalActive;
+  return activeIndices[nextPos];
 }
 
 export function App() {
@@ -128,7 +153,6 @@ export function App() {
   const [effects, setEffects] = useState<TableSpecialEffect[]>([]);
   const [winner, setWinner] = useState<Player | null>(null);
 
-  // Latest flight/effect refs for syncing to peers
   const latestFlightRef = useRef<NetworkFlightEvent | null>(null);
   const latestEffectRef = useRef<TableSpecialEffect | null>(null);
   const seenFlightIdRef = useRef<string>('');
@@ -194,7 +218,7 @@ export function App() {
   );
 
   const startNewMatch = useCallback(
-    (targetMode: GameMode = mode) => {
+    (targetMode: GameMode = mode, customActiveMask?: boolean[]) => {
       if (aiTimerRef.current) {
         window.clearTimeout(aiTimerRef.current);
       }
@@ -202,11 +226,17 @@ export function App() {
       setPlayers((prevPlayers) =>
         INITIAL_PLAYERS_META.map((meta, idx) => {
           const existing = prevPlayers[idx];
+          const isActive = customActiveMask
+            ? customActiveMask[idx]
+            : existing
+            ? existing.isActive
+            : true;
           return {
             ...meta,
             name: existing ? existing.name : meta.name,
             title: existing ? existing.title : meta.title,
             isAI: existing ? existing.isAI : meta.isAI,
+            isActive: idx === 0 ? true : isActive,
             hand:
               idx === 0
                 ? deal.playerHand
@@ -231,9 +261,9 @@ export function App() {
   );
 
   useEffect(() => {
-    startNewMatch(mode);
+    // Start in 1v1 mode by default (Host vs Top Opponent Nyx) so the table isn't crowded with 3 bots unless requested!
+    startNewMatch(mode, [true, false, true, false]);
 
-    // Check if URL has ?room=XXXXX to auto-join a friend's room
     const params = new URLSearchParams(window.location.search);
     const inviteRoom = params.get('room');
     if (inviteRoom && inviteRoom.trim()) {
@@ -288,14 +318,6 @@ export function App() {
     winner,
   ]);
 
-  const getNextPlayerIndex = useCallback(
-    (currentIndex: number, dir: 1 | -1, steps = 1) => {
-      const total = 4;
-      return (((currentIndex + dir * steps) % total) + total) % total;
-    },
-    []
-  );
-
   const pullCardsFromDeck = useCallback(
     (
       count: number,
@@ -311,6 +333,99 @@ export function App() {
     [mode]
   );
 
+  // Manual Bot Controls: Add Bot to a specific seat (1, 2, or 3)
+  const handleAddBotToSeat = useCallback(
+    (seatIdx: number) => {
+      if (seatIdx <= 0 || seatIdx > 3) return;
+      const { drawn, nextDeck } = pullCardsFromDeck(7, drawPile);
+      setDrawPile(nextDeck);
+      setPlayers((prev) =>
+        prev.map((p, idx) =>
+          idx === seatIdx
+            ? {
+                ...p,
+                name: INITIAL_PLAYERS_META[seatIdx].name,
+                title: INITIAL_PLAYERS_META[seatIdx].title,
+                isAI: true,
+                isActive: true,
+                hand: sortHandCards(drawn),
+                calledUno: false,
+              }
+            : p
+        )
+      );
+    },
+    [drawPile, pullCardsFromDeck]
+  );
+
+  // Manual Bot Controls: Remove Bot from a specific seat (1, 2, or 3)
+  const handleRemoveBotFromSeat = useCallback(
+    (seatIdx: number) => {
+      if (seatIdx <= 0 || seatIdx > 3) return;
+      setPlayers((prev) => {
+        const updated = prev.map((p, idx) =>
+          idx === seatIdx && p.isAI ? { ...p, isActive: false } : p
+        );
+        if (turnIndex === seatIdx) {
+          if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
+          setTurnIndex(getNextActivePlayerIndex(seatIdx, direction, 1, updated));
+        }
+        return updated;
+      });
+    },
+    [turnIndex, direction]
+  );
+
+  // Quick Presets: '1v1' | '1v3' | 'no_bots'
+  const handleSetBotPreset = useCallback(
+    (preset: '1v1' | '1v3' | 'no_bots') => {
+      if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
+      setPlayers((prev) => {
+        const hasOnlineFriends = prev.some((p, i) => i > 0 && !p.isAI && p.isActive);
+        const updated = prev.map((p, idx) => {
+          if (idx === 0) return { ...p, isActive: true };
+          // Never kick a connected human friend
+          if (!p.isAI && p.isActive) return p;
+
+          if (preset === 'no_bots') {
+            return { ...p, isAI: true, isActive: false };
+          }
+          if (preset === '1v1') {
+            // If an online friend is already in the room, 1v1 needs 0 bots; otherwise activate Top seat (idx === 2)
+            const shouldActivateBot = !hasOnlineFriends && idx === 2;
+            return {
+              ...p,
+              name: INITIAL_PLAYERS_META[idx].name,
+              title: INITIAL_PLAYERS_META[idx].title,
+              isAI: true,
+              isActive: shouldActivateBot,
+              hand:
+                p.hand.length > 0
+                  ? p.hand
+                  : sortHandCards(createDeck(mode).slice(0, 7)),
+            };
+          }
+          // '1v3': activate all 3 seats
+          return {
+            ...p,
+            name: INITIAL_PLAYERS_META[idx].name,
+            title: INITIAL_PLAYERS_META[idx].title,
+            isAI: true,
+            isActive: true,
+            hand:
+              p.hand.length > 0
+                ? p.hand
+                : sortHandCards(createDeck(mode).slice(0, 7)),
+          };
+        });
+
+        setTurnIndex(0);
+        return updated;
+      });
+    },
+    [mode]
+  );
+
   // Core card play resolution (authoritative on Host / Offline)
   const commitCardPlay = useCallback(
     (
@@ -319,7 +434,10 @@ export function App() {
       chosenWildColor?: ActiveColor
     ) => {
       const actingPlayer = players[playerIdx];
-      if (!actingPlayer) return;
+      if (!actingPlayer || !actingPlayer.isActive) return;
+
+      const activePlayersCount = players.filter((p) => p.isActive).length;
+      if (activePlayersCount < 2) return;
 
       soundFX.playCardPlay();
 
@@ -386,16 +504,30 @@ export function App() {
         nextDir = (direction * -1) as 1 | -1;
         setDirection(nextDir);
         soundFX.playSpecialEffect('reverse');
+
+        // In 1v1 (2 active players), Reverse acts like Skip so the player plays again!
+        if (activePlayersCount === 2 && card.value === 'reverse') {
+          stepAdvance = 2;
+        }
+
         triggerTableEffect({
           type: 'reverse',
           color: nextColor,
-          label: '⇄ DIRECTION REVERSED',
+          label:
+            activePlayersCount === 2 && card.value === 'reverse'
+              ? '⇄ REVERSE (1v1 SKIP)'
+              : '⇄ DIRECTION REVERSED',
         });
       }
 
       if (card.value === 'skip') {
         stepAdvance = 2;
-        const skippedIdx = getNextPlayerIndex(playerIdx, nextDir, 1);
+        const skippedIdx = getNextActivePlayerIndex(
+          playerIdx,
+          nextDir,
+          1,
+          nextPlayers
+        );
         const skippedSeat = nextPlayers[skippedIdx];
         setSkippedPlayerId(skippedSeat.id);
         window.setTimeout(() => setSkippedPlayerId(null), 1100);
@@ -427,7 +559,12 @@ export function App() {
         nextPenalty += addedPenalty;
         setPendingPenalty(nextPenalty);
         soundFX.playSpecialEffect('penalty');
-        const targetIdx = getNextPlayerIndex(playerIdx, nextDir, 1);
+        const targetIdx = getNextActivePlayerIndex(
+          playerIdx,
+          nextDir,
+          1,
+          nextPlayers
+        );
         triggerTableEffect({
           type: 'draw_penalty',
           color: nextColor,
@@ -440,7 +577,13 @@ export function App() {
       if (sevenZeroRule && card.value === '0') {
         const snapshotHands = nextPlayers.map((p) => p.hand);
         nextPlayers = nextPlayers.map((p, idx) => {
-          const donorIdx = getNextPlayerIndex(idx, (nextDir * -1) as 1 | -1, 1);
+          if (!p.isActive) return p;
+          const donorIdx = getNextActivePlayerIndex(
+            idx,
+            (nextDir * -1) as 1 | -1,
+            1,
+            nextPlayers
+          );
           return {
             ...p,
             hand: sortHandCards(snapshotHands[donorIdx]),
@@ -456,14 +599,40 @@ export function App() {
 
       if (sevenZeroRule && card.value === '7') {
         if (!actingPlayer.isAI) {
-          setPlayers(nextPlayers);
-          setAwaitingSevenSwapForSeat(playerIdx);
-          return;
+          // If 1v1 (only 1 active opponent), swap immediately with that opponent without needing an extra click!
+          const otherActive = nextPlayers.filter(
+            (p, i) => p.isActive && i !== playerIdx
+          );
+          if (otherActive.length === 1) {
+            const otherIdx = nextPlayers.findIndex(
+              (p) => p.id === otherActive[0].id
+            );
+            const myHand = nextPlayers[playerIdx].hand;
+            nextPlayers[playerIdx] = {
+              ...nextPlayers[playerIdx],
+              hand: sortHandCards(nextPlayers[otherIdx].hand),
+            };
+            nextPlayers[otherIdx] = {
+              ...nextPlayers[otherIdx],
+              hand: sortHandCards(myHand),
+            };
+            triggerTableEffect({
+              type: 'seven_swap',
+              color: nextColor,
+              label: `7 RULE • SWAPPED HANDS WITH ${nextPlayers[
+                otherIdx
+              ].name.toUpperCase()}`,
+            });
+          } else {
+            setPlayers(nextPlayers);
+            setAwaitingSevenSwapForSeat(playerIdx);
+            return;
+          }
         } else {
           let bestTargetIdx = 0;
           let minCount = 999;
           nextPlayers.forEach((p, idx) => {
-            if (idx !== playerIdx && p.hand.length < minCount) {
+            if (p.isActive && idx !== playerIdx && p.hand.length < minCount) {
               minCount = p.hand.length;
               bestTargetIdx = idx;
             }
@@ -488,7 +657,12 @@ export function App() {
       }
 
       setPlayers(nextPlayers);
-      const nextTurn = getNextPlayerIndex(playerIdx, nextDir, stepAdvance);
+      const nextTurn = getNextActivePlayerIndex(
+        playerIdx,
+        nextDir,
+        stepAdvance,
+        nextPlayers
+      );
       setTurnIndex(nextTurn);
     },
     [
@@ -499,15 +673,14 @@ export function App() {
       mySeatIndex,
       spawnNetworkFlight,
       triggerTableEffect,
-      getNextPlayerIndex,
     ]
   );
 
-  // Draw Card(s) for any player
+  // Draw Card(s) for any active player
   const executePlayerDraw = useCallback(
     (playerIdx: number) => {
       const targetPlayer = players[playerIdx];
-      if (!targetPlayer) return;
+      if (!targetPlayer || !targetPlayer.isActive) return;
 
       const drawCount = pendingPenalty > 0 ? pendingPenalty : 1;
       const { drawn, nextDeck } = pullCardsFromDeck(drawCount, drawPile);
@@ -548,7 +721,9 @@ export function App() {
       setDrawPile(nextDeck);
       setPlayers(nextPlayers);
       setPendingPenalty(0);
-      setTurnIndex(getNextPlayerIndex(playerIdx, direction, 1));
+      setTurnIndex(
+        getNextActivePlayerIndex(playerIdx, direction, 1, nextPlayers)
+      );
     },
     [
       players,
@@ -560,14 +735,15 @@ export function App() {
       pullCardsFromDeck,
       spawnNetworkFlight,
       triggerTableEffect,
-      getNextPlayerIndex,
     ]
   );
 
   // Execute a 7-Swap chosen by any human seat
   const executeSevenSwapForSeat = useCallback(
     (sourceSeatIdx: number, targetPlayerId: string) => {
-      const targetIdx = players.findIndex((p) => p.id === targetPlayerId);
+      const targetIdx = players.findIndex(
+        (p) => p.id === targetPlayerId && p.isActive
+      );
       if (targetIdx === -1) return;
 
       const updated = [...players];
@@ -594,9 +770,11 @@ export function App() {
 
       setPlayers(updated);
       setAwaitingSevenSwapForSeat(null);
-      setTurnIndex(getNextPlayerIndex(sourceSeatIdx, direction, 1));
+      setTurnIndex(
+        getNextActivePlayerIndex(sourceSeatIdx, direction, 1, updated)
+      );
     },
-    [players, activeColor, direction, triggerTableEffect, getNextPlayerIndex]
+    [players, activeColor, direction, triggerTableEffect]
   );
 
   // Configure PeerJS callbacks so Host processes Client actions and Clients apply Host state
@@ -611,7 +789,17 @@ export function App() {
       setPlayers((prev) =>
         prev.map((p, idx) =>
           idx === seatIdx
-            ? { ...p, name: friendName, title: 'ONLINE FRIEND', isAI: false }
+            ? {
+                ...p,
+                name: friendName,
+                title: 'ONLINE FRIEND',
+                isAI: false,
+                isActive: true,
+                hand:
+                  p.hand.length > 0
+                    ? p.hand
+                    : sortHandCards(createDeck(mode).slice(0, 7)),
+              }
             : p
         )
       );
@@ -619,18 +807,23 @@ export function App() {
 
     mpManager.onClientLeft = (seatIdx) => {
       setConnectedFriendsCount(mpManager.getConnectedPeerCount());
-      setPlayers((prev) =>
-        prev.map((p, idx) =>
+      setPlayers((prev) => {
+        const updated = prev.map((p, idx) =>
           idx === seatIdx
             ? {
                 ...p,
                 name: INITIAL_PLAYERS_META[seatIdx].name,
                 title: INITIAL_PLAYERS_META[seatIdx].title,
                 isAI: true,
+                isActive: false, // Leave seat empty when friend disconnects unless a bot is manually added
               }
             : p
-        )
-      );
+        );
+        if (turnIndex === seatIdx) {
+          setTurnIndex(getNextActivePlayerIndex(seatIdx, direction, 1, updated));
+        }
+        return updated;
+      });
     };
 
     mpManager.onClientAction = (msg: ClientActionMessage) => {
@@ -665,6 +858,7 @@ export function App() {
       setPlayers(
         state.players.map((p) => ({
           ...p,
+          isActive: p.isActive ?? true,
           hand: sortHandCards(p.hand),
         }))
       );
@@ -677,7 +871,6 @@ export function App() {
       setAwaitingSevenSwapForSeat(state.awaitingSevenSwapForSeat);
       setWinner(state.winner);
 
-      // Replay any new card flight from Host on this viewer's screen using relative seat coordinates
       if (
         state.latestFlight &&
         state.latestFlight.id !== seenFlightIdRef.current
@@ -720,15 +913,19 @@ export function App() {
       }
     };
   }, [
+    mode,
     players,
     turnIndex,
+    direction,
     awaitingSevenSwapForSeat,
     commitCardPlay,
     executePlayerDraw,
     executeSevenSwapForSeat,
   ]);
 
-  const isMyTurn = turnIndex === mySeatIndex;
+  const activeTotalPlayers = players.filter((p) => p.isActive).length;
+  const activeBotCount = players.filter((p) => p.isActive && p.isAI).length;
+  const isMyTurn = turnIndex === mySeatIndex && activeTotalPlayers >= 2;
   const awaitingMySevenSwap = awaitingSevenSwapForSeat === mySeatIndex;
 
   const handlePlayerPlayCard = (card: UnoCardData) => {
@@ -789,7 +986,9 @@ export function App() {
   const runAiTurnRef = useRef<() => void>(() => {});
   runAiTurnRef.current = () => {
     const activeSeatPlayer = players[turnIndex];
-    if (!activeSeatPlayer || !activeSeatPlayer.isAI) return;
+    if (!activeSeatPlayer || !activeSeatPlayer.isAI || !activeSeatPlayer.isActive) {
+      return;
+    }
 
     const topCard = discardPile[discardPile.length - 1];
     const playableCards = activeSeatPlayer.hand.filter((c) =>
@@ -827,11 +1026,14 @@ export function App() {
   };
 
   // AI Turn Controller: bots take 5 to 10 seconds (5000ms - 10000ms) per turn
-  const activeSeatIsAI = players[turnIndex]?.isAI ?? false;
+  const activeSeatIsAI =
+    Boolean(players[turnIndex]?.isAI) && Boolean(players[turnIndex]?.isActive);
+
   useEffect(() => {
     if (
       mpRole === 'client' ||
       players.length === 0 ||
+      activeTotalPlayers < 2 ||
       !activeSeatIsAI ||
       winner ||
       awaitingSevenSwapForSeat !== null ||
@@ -840,7 +1042,6 @@ export function App() {
       return;
     }
 
-    // Randomize bot thinking time between 5,000ms (5s) and 10,000ms (10s)
     const botThinkDelayMs = 5000 + Math.floor(Math.random() * 5001);
 
     aiTimerRef.current = window.setTimeout(() => {
@@ -854,6 +1055,7 @@ export function App() {
     mpRole,
     turnIndex,
     activeSeatIsAI,
+    activeTotalPlayers,
     discardPile.length,
     drawPile.length,
     winner,
@@ -875,8 +1077,9 @@ export function App() {
   const topOpponent: Player = { ...players[topPlayerIdx], seat: 'top' };
   const rightOpponent: Player = { ...players[rightPlayerIdx], seat: 'right' };
 
-  const activePlayer = players[turnIndex];
+  const activePlayer = players[turnIndex] ?? myPlayer;
   const topDiscard = discardPile[discardPile.length - 1];
+  const canManageBots = mpRole !== 'client';
 
   return (
     <div className="uno-billiards-app-root">
@@ -884,28 +1087,40 @@ export function App() {
         {/* TOP OPPONENT */}
         <OpponentSeat
           player={topOpponent}
-          isActiveTurn={turnIndex === topPlayerIdx}
+          seatIndex={topPlayerIdx}
+          isActiveTurn={turnIndex === topPlayerIdx && topOpponent.isActive}
           isSkipped={skippedPlayerId === topOpponent.id}
-          selectableForSwap={awaitingMySevenSwap}
+          selectableForSwap={awaitingMySevenSwap && topOpponent.isActive}
+          canManageBots={canManageBots}
           onSelectForSwap={handleSelectSwapOpponent}
+          onAddBotToSeat={handleAddBotToSeat}
+          onRemoveBotFromSeat={handleRemoveBotFromSeat}
         />
 
         {/* LEFT OPPONENT */}
         <OpponentSeat
           player={leftOpponent}
-          isActiveTurn={turnIndex === leftPlayerIdx}
+          seatIndex={leftPlayerIdx}
+          isActiveTurn={turnIndex === leftPlayerIdx && leftOpponent.isActive}
           isSkipped={skippedPlayerId === leftOpponent.id}
-          selectableForSwap={awaitingMySevenSwap}
+          selectableForSwap={awaitingMySevenSwap && leftOpponent.isActive}
+          canManageBots={canManageBots}
           onSelectForSwap={handleSelectSwapOpponent}
+          onAddBotToSeat={handleAddBotToSeat}
+          onRemoveBotFromSeat={handleRemoveBotFromSeat}
         />
 
         {/* RIGHT OPPONENT */}
         <OpponentSeat
           player={rightOpponent}
-          isActiveTurn={turnIndex === rightPlayerIdx}
+          seatIndex={rightPlayerIdx}
+          isActiveTurn={turnIndex === rightPlayerIdx && rightOpponent.isActive}
           isSkipped={skippedPlayerId === rightOpponent.id}
-          selectableForSwap={awaitingMySevenSwap}
+          selectableForSwap={awaitingMySevenSwap && rightOpponent.isActive}
+          canManageBots={canManageBots}
           onSelectForSwap={handleSelectSwapOpponent}
+          onAddBotToSeat={handleAddBotToSeat}
+          onRemoveBotFromSeat={handleRemoveBotFromSeat}
         />
 
         {/* CENTER GAMEPLAY FOCAL AREA: DRAW PILE, DISCARD PILE & PULSING COLOR ORB */}
@@ -942,12 +1157,14 @@ export function App() {
         onPlayCard={handlePlayerPlayCard}
       />
 
-      {/* MINIMAL COMPETITIVE GAMING HUD WITH ONLINE ROOM SUPPORT */}
+      {/* MINIMAL COMPETITIVE GAMING HUD WITH 1v1 / 1v3 / MANUAL BOT CONTROLS */}
       <GameHUD
         mode={mode}
         sevenZeroRule={sevenZeroRule}
         activePlayer={activePlayer}
         playerCardCount={myPlayer.hand.length}
+        activeBotCount={activeBotCount}
+        activeTotalPlayers={activeTotalPlayers}
         isPlayerTurn={isMyTurn}
         hasCalledUno={myPlayer.calledUno}
         muted={muted}
@@ -973,11 +1190,17 @@ export function App() {
           setMpRole('host');
           setRoomCode(code);
           setMySeatIndex(0);
+          // Automatically remove all bots when hosting an online room so friends can play pure 1v1 without bots!
           setPlayers((prev) =>
             prev.map((p, idx) =>
-              idx === 0 ? { ...p, name: hostName, title: 'ROOM HOST' } : p
+              idx === 0
+                ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
+                : p.isAI
+                ? { ...p, isActive: false }
+                : p
             )
           );
+          setTurnIndex(0);
           return code;
         }}
         onJoinOnlineRoom={async (codeToJoin, guestName) => {
@@ -991,8 +1214,9 @@ export function App() {
           setRoomCode('');
           setMySeatIndex(0);
           setConnectedFriendsCount(0);
-          startNewMatch(mode);
+          startNewMatch(mode, [true, false, true, false]);
         }}
+        onSetBotPreset={handleSetBotPreset}
         onToggleMode={() => {
           const nextMode: GameMode =
             mode === 'no_mercy' ? 'classic' : 'no_mercy';

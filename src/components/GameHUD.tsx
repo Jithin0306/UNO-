@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, RotateCcw, Users, Copy, Check, Wifi } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  RotateCcw,
+  Users,
+  Copy,
+  Check,
+  Wifi,
+  Bot,
+} from 'lucide-react';
 import { ActiveColor, GameMode, Player } from '../types/uno';
 
 interface GameHUDProps {
@@ -8,6 +17,8 @@ interface GameHUDProps {
   sevenZeroRule: boolean;
   activePlayer: Player;
   playerCardCount: number;
+  activeBotCount: number;
+  activeTotalPlayers: number;
   isPlayerTurn: boolean;
   hasCalledUno: boolean;
   muted: boolean;
@@ -21,6 +32,7 @@ interface GameHUDProps {
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
   onLeaveOnlineRoom: () => void;
+  onSetBotPreset: (preset: '1v1' | '1v3' | 'no_bots') => void;
   onToggleMode: () => void;
   onToggleSevenZero: () => void;
   onToggleMute: () => void;
@@ -35,6 +47,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   sevenZeroRule,
   activePlayer,
   playerCardCount,
+  activeBotCount,
+  activeTotalPlayers,
   isPlayerTurn,
   hasCalledUno,
   muted,
@@ -48,6 +62,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onHostOnlineRoom,
   onJoinOnlineRoom,
   onLeaveOnlineRoom,
+  onSetBotPreset,
   onToggleMode,
   onToggleSevenZero,
   onToggleMute,
@@ -62,9 +77,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
-  const turnText = isPlayerTurn
-    ? 'YOUR TURN'
-    : `${activePlayer.name.toUpperCase()}'S TURN`;
+  const turnText =
+    activeTotalPlayers < 2
+      ? 'ADD A BOT OR INVITE A FRIEND'
+      : isPlayerTurn
+      ? 'YOUR TURN'
+      : `${activePlayer.name.toUpperCase()}'S TURN`;
 
   const handleCopyInvite = () => {
     if (!roomCode) return;
@@ -76,7 +94,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
   return (
     <>
-      {/* TOP MINIMAL BAR: Top-Left Online Room Button, Top-Center Mode Info, Top-Right [ Exit ] */}
+      {/* TOP MINIMAL BAR: Top-Left Online Room Button, Top-Center Mode & Bot Presets, Top-Right [ Exit ] */}
       <header className="hud-top-minimal-bar">
         {/* Top-Left Online Multiplayer Room Pill */}
         <button
@@ -91,15 +109,50 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <Users size={13} />
           <span className="room-code-label">
             {mpRole === 'host'
-              ? `ROOM #${roomCode} (${connectedFriendsCount + 1}/4 ONLINE)`
+              ? `ROOM #${roomCode} (${connectedFriendsCount + 1} HUMAN)`
               : mpRole === 'client'
               ? `JOINED #${roomCode}`
               : 'PLAY WITH FRIENDS • ONLINE ROOM'}
           </span>
         </button>
 
-        {/* Top-Center: Game Mode / Room Information */}
+        {/* Top-Center: Table Format (1v1 / 1v3 / No Bots) & Game Mode */}
         <div className="hud-top-center-pills">
+          {mpRole !== 'client' && (
+            <div className="hud-bot-preset-group" title="Choose 1v1, 1v3, or No Bots (you can also click + ADD BOT on any seat)">
+              <Bot size={13} className="bot-preset-icon" />
+              <button
+                type="button"
+                className={`bot-preset-chip ${
+                  activeTotalPlayers === 2 && activeBotCount === 1
+                    ? 'is-active'
+                    : ''
+                }`}
+                onClick={() => onSetBotPreset('1v1')}
+              >
+                1v1
+              </button>
+              <button
+                type="button"
+                className={`bot-preset-chip ${
+                  activeTotalPlayers === 4 ? 'is-active' : ''
+                }`}
+                onClick={() => onSetBotPreset('1v3')}
+              >
+                1v3
+              </button>
+              <button
+                type="button"
+                className={`bot-preset-chip ${
+                  activeBotCount === 0 ? 'is-active' : ''
+                }`}
+                onClick={() => onSetBotPreset('no_bots')}
+              >
+                0 BOTS
+              </button>
+            </div>
+          )}
+
           <button
             type="button"
             className={`hud-mode-pill ${mode === 'no_mercy' ? 'is-no-mercy' : ''}`}
@@ -109,7 +162,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           >
             <span className="mode-badge-prefix">MODE</span>
             <span className="mode-badge-title">
-              {mode === 'no_mercy' ? 'UNO NO MERCY (+6 / +10)' : 'CLASSIC UNO'}
+              {mode === 'no_mercy' ? 'NO MERCY' : 'CLASSIC'}
             </span>
           </button>
 
@@ -120,7 +173,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             disabled={mpRole === 'client'}
             title="Toggle 7-0 Swap & Rotate Rule"
           >
-            <span>7-0 RULE: {sevenZeroRule ? 'ON' : 'OFF'}</span>
+            <span>7-0: {sevenZeroRule ? 'ON' : 'OFF'}</span>
           </button>
         </div>
 
@@ -173,7 +226,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         {/* Center-Bottom: Integrated Turn Indicator above Player's Hand */}
         <div
           className={`table-integrated-turn-banner ${
-            isPlayerTurn ? 'is-your-turn' : 'is-opponent-turn'
+            isPlayerTurn && activeTotalPlayers >= 2
+              ? 'is-your-turn'
+              : 'is-opponent-turn'
           }`}
         >
           <span className="turn-wing left-wing" />
@@ -202,9 +257,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <button
             type="button"
             className={`table-action-btn btn-draw ${
-              isPlayerTurn ? 'can-draw' : 'disabled'
+              isPlayerTurn && activeTotalPlayers >= 2 ? 'can-draw' : 'disabled'
             }`}
-            disabled={!isPlayerTurn || awaitingWildColor || awaitingSevenSwap}
+            disabled={
+              !isPlayerTurn ||
+              activeTotalPlayers < 2 ||
+              awaitingWildColor ||
+              awaitingSevenSwap
+            }
             onClick={onDrawCard}
           >
             <span>DRAW</span>
@@ -245,9 +305,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </div>
 
               <p className="lounge-desc">
-                Host a live table to generate a 5-character Room Code (and instant
-                invite link). Up to 3 friends can join your table from any browser
-                — open seats automatically stay filled by smart AI bots.
+                Hosting an online room automatically removes AI bots by default so
+                you can play pure <strong>1v1</strong> (or 3–4 player) with your
+                friends. You can also click <strong>+ ADD BOT</strong> on any empty
+                table seat at any time!
               </p>
 
               <div className="lounge-input-group">
@@ -266,7 +327,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   {/* Host Box */}
                   <div className="lounge-action-box">
                     <h4>CREATE PRIVATE TABLE</h4>
-                    <p>Start hosting and share your Room Code with friends.</p>
+                    <p>Starts a clean room with 0 bots—add bots manually if desired.</p>
                     <button
                       type="button"
                       className="lounge-primary-btn"
