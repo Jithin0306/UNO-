@@ -145,68 +145,42 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </span>
         </button>
 
-        {/* Top-Center: Table Format (1v1 / 1v3 / No Bots) & Game Mode */}
-        <div className="hud-top-center-pills">
-          {mpRole !== 'client' && (
-            <div
-              className="hud-bot-preset-group"
-              title="Choose 1v1, 1v3, or No Bots (you can also click + ADD BOT on any seat)"
-            >
-              <Bot size={13} className="bot-preset-icon" />
-              <button
-                type="button"
-                className={`bot-preset-chip ${
-                  activeTotalPlayers === 2 && activeBotCount === 1
-                    ? 'is-active'
-                    : ''
-                }`}
-                onClick={() => onSetBotPreset('1v1')}
-              >
-                1v1
-              </button>
-              <button
-                type="button"
-                className={`bot-preset-chip ${
-                  activeTotalPlayers === 4 ? 'is-active' : ''
-                }`}
-                onClick={() => onSetBotPreset('1v3')}
-              >
-                1v3
-              </button>
-              <button
-                type="button"
-                className={`bot-preset-chip ${
-                  activeBotCount === 0 ? 'is-active' : ''
-                }`}
-                onClick={() => onSetBotPreset('no_bots')}
-              >
-                0 BOTS
-              </button>
-            </div>
-          )}
+        {/* Top-Center: Locked Read-Only Match Status (Mode & Bots cannot be changed mid-game) */}
+        <div
+          className="hud-top-center-pills"
+          title="Match settings are locked while a game is in progress. Return to HOME to start a different mode or bot setup."
+        >
+          <div className="hud-mode-pill" style={{ cursor: 'default' }}>
+            <Bot size={13} className="bot-preset-icon" />
+            <span className="mode-badge-title">
+              {activeTotalPlayers === 2
+                ? '1v1 DUEL'
+                : `${activeTotalPlayers} PLAYERS`}
+            </span>
+          </div>
 
-          <button
-            type="button"
-            className={`hud-mode-pill ${mode === 'no_mercy' ? 'is-no-mercy' : ''}`}
-            onClick={onToggleMode}
-            disabled={mpRole === 'client'}
-            title="Click to switch between UNO No Mercy and Classic UNO"
+          <div
+            className={`hud-mode-pill ${
+              mode === 'no_mercy' ? 'is-no-mercy' : ''
+            }`}
+            style={{ cursor: 'default' }}
           >
             <span className="mode-badge-prefix">MODE</span>
             <span className="mode-badge-title">
               {mode === 'no_mercy' ? 'NO MERCY' : 'CLASSIC'}
             </span>
-          </button>
+          </div>
 
-          <button
-            type="button"
-            className={`hud-rule-pill ${sevenZeroRule ? 'rule-on' : 'rule-off'}`}
-            onClick={onToggleSevenZero}
-            disabled={mpRole === 'client'}
-            title="Toggle 7-0 Swap & Rotate Rule"
+          <div
+            className={`hud-rule-pill ${
+              sevenZeroRule || mode === 'no_mercy' ? 'rule-on' : 'rule-off'
+            }`}
+            style={{ cursor: 'default' }}
           >
-            <span>7-0: {sevenZeroRule ? 'ON' : 'OFF'}</span>
-          </button>
+            <span>
+              7-0: {sevenZeroRule || mode === 'no_mercy' ? 'ON' : 'OFF'}
+            </span>
+          </div>
         </div>
 
         {/* Top-Right: Mute & [ Exit ] */}
@@ -225,7 +199,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             type="button"
             className="hud-exit-bracket-btn"
             onClick={onNewMatch}
-            title="Reset Table / Deal New Match"
+            title="Return to Home Screen"
           >
             <span className="bracket-char">[</span>
             <span className="exit-word">EXIT</span>
@@ -283,17 +257,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <span className="turn-wing right-wing" />
         </div>
 
-        {/* Right: UNO Button & DRAW Button */}
+        {/* Right: UNO Button (Disabled until player can actually call UNO) & DRAW Button */}
         <div className="hud-bottom-right-controls">
-          <button
-            type="button"
-            className={`table-action-btn btn-uno ${
-              playerCardCount <= 2 && !hasCalledUno ? 'uno-ready-pulse' : ''
-            } ${hasCalledUno ? 'uno-called' : ''}`}
-            onClick={onCallUno}
-          >
-            <span>{hasCalledUno ? 'UNO CALLED!' : 'UNO'}</span>
-          </button>
+          {(() => {
+            const canCallUnoNow =
+              (playerCardCount === 1 ||
+                (playerCardCount === 2 && isPlayerTurn)) &&
+              !hasCalledUno &&
+              activeTotalPlayers >= 2;
+            return (
+              <button
+                type="button"
+                disabled={!canCallUnoNow}
+                className={`table-action-btn btn-uno ${
+                  canCallUnoNow ? 'uno-ready-pulse' : 'disabled'
+                } ${hasCalledUno ? 'uno-called' : ''}`}
+                onClick={() => {
+                  if (canCallUnoNow) onCallUno();
+                }}
+              >
+                <span>{hasCalledUno ? 'UNO CALLED!' : 'UNO'}</span>
+              </button>
+            );
+          })()}
 
           <button
             type="button"

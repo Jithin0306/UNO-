@@ -1454,7 +1454,8 @@ export function App() {
 
   const activePlayer = players[turnIndex] ?? myPlayer;
   const topDiscard = discardPile[discardPile.length - 1];
-  const canManageBots = mpRole !== 'client';
+  // Lock bot management during a match so neither Host nor player can add/remove bots in between a game
+  const canManageBots = false;
 
   return (
     <div className="uno-billiards-app-root">

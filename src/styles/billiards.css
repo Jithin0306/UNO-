@@ -1067,11 +1067,12 @@ body,
   bottom: 8px;
   left: 0;
   right: 0;
-  height: 220px;
+  height: 240px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 40;
+  z-index: 62;
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -1101,16 +1102,10 @@ body,
 }
 
 .player-hand-scroll-viewport {
-  max-width: 96vw;
-  padding: 46px 28px 14px;
-  overflow-x: auto;
-  overflow-y: visible;
-  pointer-events: auto;
-  scrollbar-width: none;
-}
-
-.player-hand-scroll-viewport::-webkit-scrollbar {
-  display: none;
+  max-width: 100vw;
+  padding: 96px 28px 14px;
+  overflow: visible !important;
+  pointer-events: none;
 }
 
 .player-hand-groups-row {
@@ -1119,6 +1114,8 @@ body,
   width: max-content;
   margin: 0 auto;
   gap: 26px;
+  overflow: visible;
+  pointer-events: auto;
 }
 
 .hand-color-cluster {
@@ -1686,9 +1683,14 @@ body,
     0 0 16px rgba(245, 158, 11, 0.38);
 }
 
-.table-action-btn.disabled {
-  opacity: 0.42;
+.table-action-btn.disabled,
+.table-action-btn:disabled {
+  opacity: 0.32;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(148, 163, 184, 0.55);
+  box-shadow: none;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .table-action-btn.uno-ready-pulse {
@@ -2396,32 +2398,39 @@ body,
   position: relative;
   display: inline-block;
   margin-top: -2px;
+  overflow: visible;
 }
 
 .nm-title-bloom {
   position: absolute;
   inset: 0;
+  display: inline-block;
+  padding: 6px 24px;
   font-family: var(--font-condensed);
   font-size: clamp(58px, 7vw, 76px);
   font-weight: 800;
   font-style: italic;
-  line-height: 0.92;
+  line-height: 0.96;
   letter-spacing: 3px;
   color: #f43f5e;
   filter: blur(22px);
   opacity: 0.6;
   user-select: none;
   pointer-events: none;
+  white-space: nowrap;
 }
 
 .nm-title-main {
   position: relative;
+  display: inline-block;
+  padding: 6px 24px;
   font-family: var(--font-condensed);
   font-size: clamp(58px, 7vw, 76px);
   font-weight: 800;
   font-style: italic;
-  line-height: 0.92;
+  line-height: 0.96;
   letter-spacing: 3px;
+  white-space: nowrap;
   background: linear-gradient(
     180deg,
     #ffffff 0%,
