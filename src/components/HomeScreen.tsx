@@ -5,18 +5,14 @@ import {
   Zap,
   Settings,
   Globe,
+  Trophy,
   BookOpen,
   Check,
   Copy,
   ArrowLeft,
   Play,
   Users,
-  Sparkles,
-  ShieldAlert,
-  Crown,
-  Flame,
-  Swords,
-  Layers,
+  ChevronRight,
 } from 'lucide-react';
 import { GameMode } from '../types/uno';
 
@@ -56,12 +52,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onEnterOnlineTable,
 }) => {
   const [nameInput, setNameInput] = useState(
-    savedName && savedName !== 'Player 1' ? savedName : ''
+    savedName && savedName !== 'Player 1' ? savedName : 'Commander'
   );
   const [nameSavedToast, setNameSavedToast] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'main' | 'custom' | 'online' | 'rules'
+    'main' | 'custom' | 'online' | 'career' | 'rules'
   >(initialInviteCode ? 'online' : 'main');
+  const [quickFormat, setQuickFormat] = useState<'1v1' | '1v3'>('1v1');
   const [customPreset, setCustomPreset] = useState<'1v1' | '1v3' | 'no_bots'>(
     '1v1'
   );
@@ -84,7 +81,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setNameInput(clean);
     onSavePlayerName(clean);
     setNameSavedToast(true);
-    window.setTimeout(() => setNameSavedToast(false), 2000);
+    window.setTimeout(() => setNameSavedToast(false), 1800);
     return clean;
   };
 
@@ -96,613 +93,595 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const displayAvatarSeed = encodeURIComponent(
-    nameInput.trim() || savedName || 'Commander'
-  );
-
   return (
-    <div className="home-screen-overlay">
-      {/* Overhead Billiards Lamp Cone & Ambient Felt Glow */}
-      <div className="home-lamp-cone" />
-      <div className="home-ambient-glow" />
-      <div className="home-felt-grid-pattern" />
+    <div className="nm-home-backdrop">
+      {/* Ambient Atmospheric Glows (Crimson Rose + Deep Indigo + Subtle Emerald) */}
+      <div className="nm-aura-crimson" />
+      <div className="nm-aura-indigo" />
+      <div className="nm-vignette-layer" />
+
+      {/* Subtle Floating Ambient UNO Cards in Deep Background */}
+      <div className="nm-ambient-cards-layer" aria-hidden="true">
+        <motion.div
+          className="nm-bg-card nm-bg-card-1"
+          animate={{ y: [0, -14, 0], rotate: [-18, -14, -18] }}
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <span>+10</span>
+        </motion.div>
+        <motion.div
+          className="nm-bg-card nm-bg-card-2"
+          animate={{ y: [0, 16, 0], rotate: [22, 26, 22] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <span>7</span>
+        </motion.div>
+        <motion.div
+          className="nm-bg-card nm-bg-card-3"
+          animate={{ y: [0, -12, 0], rotate: [12, 8, 12] }}
+          transition={{ duration: 6.5, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <span>+4</span>
+        </motion.div>
+        <motion.div
+          className="nm-bg-card nm-bg-card-4"
+          animate={{ y: [0, 14, 0], rotate: [-24, -20, -24] }}
+          transition={{ duration: 7.5, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <span>0</span>
+        </motion.div>
+      </div>
 
       <motion.div
-        className="home-vip-stage"
-        initial={{ opacity: 0, y: 22, scale: 0.97 }}
+        className="nm-center-container"
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* ============================================================
-            HERO CREST WITH 3D FANNED PHYSICAL UNO CARDS
+            HERO BRANDING (ICONIC WHITE-TO-CRIMSON GLOWING TYPOGRAPHY)
            ============================================================ */}
-        <div className="home-hero-showcase">
-          {/* 3D Fanned Physical Cards Behind Crest */}
-          <div className="home-fanned-cards-crown" aria-hidden="true">
-            <motion.div
-              className="hero-showcase-card hcard-left-far card-red"
-              animate={{ y: [0, -5, 0], rotate: [-28, -30, -28] }}
-              transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <span className="hcard-corner">7</span>
-              <div className="hcard-oval">7</div>
-            </motion.div>
-
-            <motion.div
-              className="hero-showcase-card hcard-left-mid card-green"
-              animate={{ y: [0, -7, 0], rotate: [-14, -15, -14] }}
-              transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
-            >
-              <span className="hcard-corner">⇄</span>
-              <div className="hcard-oval">⇄</div>
-            </motion.div>
-
-            <motion.div
-              className="hero-showcase-card hcard-center card-wild-ten"
-              animate={{ y: [0, -9, 0], scale: [1, 1.03, 1] }}
-              transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut', delay: 0.1 }}
-            >
-              <span className="hcard-corner">+10</span>
-              <div className="hcard-oval hcard-wild-oval">+10</div>
-              <div className="hcard-foil-glint" />
-            </motion.div>
-
-            <motion.div
-              className="hero-showcase-card hcard-right-mid card-blue"
-              animate={{ y: [0, -7, 0], rotate: [14, 15, 14] }}
-              transition={{ duration: 4.1, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
-            >
-              <span className="hcard-corner">0</span>
-              <div className="hcard-oval">0</div>
-            </motion.div>
-
-            <motion.div
-              className="hero-showcase-card hcard-right-far card-yellow"
-              animate={{ y: [0, -5, 0], rotate: [28, 30, 28] }}
-              transition={{ duration: 4.7, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
-            >
-              <span className="hcard-corner">+4</span>
-              <div className="hcard-oval">+4</div>
-            </motion.div>
+        <div className="nm-hero-header">
+          <div className="nm-title-wrapper">
+            <span className="nm-title-bloom" aria-hidden="true">
+              NO MERCY
+            </span>
+            <h1 className="nm-title-main">NO MERCY</h1>
           </div>
 
-          {/* Series Ribbon Badge */}
-          <div className="home-series-ribbon">
-            <Crown size={12} className="ribbon-crown-icon" />
-            <span>UNO ROYALE • HIGH-STAKES BILLIARDS EDITION</span>
-            <Crown size={12} className="ribbon-crown-icon" />
-          </div>
+          <div className="nm-subtitle">NO APOLOGIES. NO LIMITS.</div>
 
-          {/* Metallic Gold & Crimson Hero Title */}
-          <h1 className="home-hero-title" data-text="NO MERCY">
-            NO MERCY
-          </h1>
-
-          <div className="home-hero-subtitle-row">
-            <span className="brass-wing-line" />
-            <span className="home-hero-subtitle">NO APOLOGIES. NO LIMITS.</span>
-            <span className="brass-wing-line" />
-          </div>
-
-          <p className="home-hero-tagline">
-            Stack brutal <strong className="text-gold">+10</strong> penalties, swap hands on{' '}
-            <strong className="text-gold">7</strong>, rotate all decks on{' '}
-            <strong className="text-gold">0</strong>, and knock out anyone who hits{' '}
-            <strong className="text-crimson">25+ cards</strong>.
+          <p className="nm-tagline">
+            Stack, swap hands, draw +10, and eliminate at 25 cards!
           </p>
         </div>
 
         {/* ============================================================
-            MAHOGANY & BRASS VIP LOUNGE CONSOLE
+            SLEEK FROSTED OBSIDIAN GLASS MENU CARD
            ============================================================ */}
-        <div className="home-mahogany-frame">
-          {/* Four Corner Brass Pocket Rivets */}
-          <span className="brass-corner-rivet rivet-tl" />
-          <span className="brass-corner-rivet rivet-tr" />
-          <span className="brass-corner-rivet rivet-bl" />
-          <span className="brass-corner-rivet rivet-br" />
+        <div className="nm-glass-card">
+          <div className="nm-glass-top-highlight" />
 
-          <div className="home-menu-card">
-            {/* VIP PLAYER IDENTITY PASS (Name Input + Explicit SAVE Button) */}
-            <div className="home-vip-pass-bar">
-              <div className="vip-pass-header">
-                <div className="vip-pass-label">
-                  <Sparkles size={12} className="text-gold" />
-                  <span>TABLE SEAT IDENTITY</span>
-                </div>
-                <div className="vip-pass-sync-pill">
-                  <span className={`sync-dot ${nameSavedToast ? 'pulse-green' : ''}`} />
-                  <span>
-                    {nameSavedToast
-                      ? 'NAME LOCKED & SYNCED'
-                      : `PLAYING AS: ${(nameInput.trim() || savedName || 'COMMANDER').toUpperCase()}`}
-                  </span>
-                </div>
-              </div>
+          {/* PLAYER NAME CAPSULE WITH INTEGRATED SAVE BUTTON */}
+          <div className="nm-profile-input-capsule">
+            <User size={15} className="nm-profile-icon" />
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitNameSave();
+              }}
+              placeholder="Enter your player name..."
+              maxLength={16}
+              aria-label="Player Name"
+            />
+            <button
+              type="button"
+              className={`nm-profile-save-btn ${nameSavedToast ? 'is-saved' : ''}`}
+              onClick={commitNameSave}
+            >
+              {nameSavedToast ? (
+                <>
+                  <Check size={12} strokeWidth={3} />
+                  <span>SAVED</span>
+                </>
+              ) : (
+                <span>SAVE</span>
+              )}
+            </button>
+          </div>
 
-              <div className="home-name-row">
-                <div className="vip-avatar-badge">
-                  <img
-                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${displayAvatarSeed}`}
-                    alt="Player Avatar"
-                  />
-                </div>
-
-                <div className="home-name-input-wrap">
-                  <User size={15} className="home-input-icon" />
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitNameSave();
+          <AnimatePresence mode="wait">
+            {/* ============================================================
+                MAIN MENU STACK (FAITHFUL TO REFERENCE + PREMIUM GLASS POLISH)
+               ============================================================ */}
+            {activeTab === 'main' && (
+              <motion.div
+                key="nm-tab-main"
+                className="nm-menu-stack"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+              >
+                {/* 1. QUICK PLAY (VS BOTS) - SIGNATURE CRIMSON ROSE CTA */}
+                <div className="nm-quickplay-group">
+                  <button
+                    type="button"
+                    className="nm-btn nm-btn-crimson"
+                    onClick={() => {
+                      commitNameSave();
+                      onStartQuickPlay(quickFormat);
                     }}
-                    placeholder="Enter your display name..."
-                    maxLength={16}
-                  />
+                  >
+                    <Zap size={16} className="nm-icon-amber" fill="currentColor" />
+                    <span>QUICK PLAY ({quickFormat.toUpperCase()} VS BOTS)</span>
+                  </button>
+
+                  {/* Subtle inline format toggle pill (1v1 / 1v3) */}
+                  <div className="nm-quick-toggle" title="Select Quick Play Bot Format">
+                    <button
+                      type="button"
+                      className={`nm-qpill ${quickFormat === '1v1' ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuickFormat('1v1');
+                      }}
+                    >
+                      1v1
+                    </button>
+                    <button
+                      type="button"
+                      className={`nm-qpill ${quickFormat === '1v3' ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuickFormat('1v3');
+                      }}
+                    >
+                      1v3
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. CUSTOM MATCH */}
+                <button
+                  type="button"
+                  className="nm-btn nm-btn-slate"
+                  onClick={() => {
+                    commitNameSave();
+                    setActiveTab('custom');
+                  }}
+                >
+                  <span className="nm-btn-left">
+                    <Settings size={16} className="nm-icon-violet" />
+                    <span>CUSTOM MATCH</span>
+                  </span>
+                  <ChevronRight size={15} className="nm-btn-chevron" />
+                </button>
+
+                {/* 3. WEBRTC P2P ROOM */}
+                <button
+                  type="button"
+                  className="nm-btn nm-btn-slate"
+                  onClick={() => {
+                    commitNameSave();
+                    setActiveTab('online');
+                  }}
+                >
+                  <span className="nm-btn-left">
+                    <Globe size={16} className="nm-icon-cyan" />
+                    <span>WEBRTC P2P ROOM</span>
+                  </span>
+                  {mpRole !== 'offline' ? (
+                    <span className="nm-live-room-badge">#{roomCode}</span>
+                  ) : (
+                    <ChevronRight size={15} className="nm-btn-chevron" />
+                  )}
+                </button>
+
+                {/* 4. BATTLE CAREER */}
+                <button
+                  type="button"
+                  className="nm-btn nm-btn-slate"
+                  onClick={() => {
+                    commitNameSave();
+                    setActiveTab('career');
+                  }}
+                >
+                  <span className="nm-btn-left">
+                    <Trophy size={16} className="nm-icon-gold" />
+                    <span>BATTLE CAREER</span>
+                  </span>
+                  <ChevronRight size={15} className="nm-btn-chevron" />
+                </button>
+
+                {/* 5. RULEBOOK & CARDS */}
+                <button
+                  type="button"
+                  className="nm-btn nm-btn-slate"
+                  onClick={() => setActiveTab('rules')}
+                >
+                  <span className="nm-btn-left">
+                    <BookOpen size={16} className="nm-icon-emerald" />
+                    <span>RULEBOOK &amp; CARDS</span>
+                  </span>
+                  <ChevronRight size={15} className="nm-btn-chevron" />
+                </button>
+              </motion.div>
+            )}
+
+            {/* ============================================================
+                CUSTOM MATCH SUBPANEL
+               ============================================================ */}
+            {activeTab === 'custom' && (
+              <motion.div
+                key="nm-tab-custom"
+                className="nm-subpanel"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="nm-subpanel-head">
+                  <button
+                    type="button"
+                    className="nm-back-btn"
+                    onClick={() => setActiveTab('main')}
+                  >
+                    <ArrowLeft size={14} />
+                    <span>BACK</span>
+                  </button>
+                  <span className="nm-subpanel-title">CUSTOM MATCH</span>
+                </div>
+
+                <div className="nm-field-group">
+                  <label>TABLE FORMAT &amp; BOTS</label>
+                  <div className="nm-segmented">
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${customPreset === '1v1' ? 'active' : ''}`}
+                      onClick={() => setCustomPreset('1v1')}
+                    >
+                      1v1 (1 BOT)
+                    </button>
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${customPreset === '1v3' ? 'active' : ''}`}
+                      onClick={() => setCustomPreset('1v3')}
+                    >
+                      1v3 (3 BOTS)
+                    </button>
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${customPreset === 'no_bots' ? 'active' : ''}`}
+                      onClick={() => setCustomPreset('no_bots')}
+                    >
+                      0 BOTS
+                    </button>
+                  </div>
+                </div>
+
+                <div className="nm-field-group">
+                  <label>GAME EDITION</label>
+                  <div className="nm-segmented">
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${mode === 'no_mercy' ? 'active' : ''}`}
+                      onClick={() => {
+                        if (mode !== 'no_mercy') onToggleMode();
+                      }}
+                    >
+                      NO MERCY (+10 / KO)
+                    </button>
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${mode === 'classic' ? 'active' : ''}`}
+                      onClick={() => {
+                        if (mode !== 'classic') onToggleMode();
+                      }}
+                    >
+                      CLASSIC UNO
+                    </button>
+                  </div>
+                </div>
+
+                <div className="nm-field-group">
+                  <label>7-0 HAND SWAP &amp; ROTATE</label>
+                  <div className="nm-segmented">
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${sevenZeroRule ? 'active' : ''}`}
+                      onClick={() => {
+                        if (!sevenZeroRule) onToggleSevenZero();
+                      }}
+                    >
+                      ENABLED
+                    </button>
+                    <button
+                      type="button"
+                      className={`nm-seg-item ${!sevenZeroRule ? 'active' : ''}`}
+                      onClick={() => {
+                        if (sevenZeroRule) onToggleSevenZero();
+                      }}
+                    >
+                      DISABLED
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   type="button"
-                  className={`home-save-name-btn ${nameSavedToast ? 'is-saved' : ''}`}
-                  onClick={commitNameSave}
+                  className="nm-btn nm-btn-crimson"
+                  onClick={() => {
+                    commitNameSave();
+                    onStartQuickPlay(customPreset);
+                  }}
                 >
-                  {nameSavedToast ? (
-                    <>
-                      <Check size={14} />
-                      <span>SAVED</span>
-                    </>
-                  ) : (
-                    <span>SAVE NAME</span>
-                  )}
+                  <Play size={15} fill="currentColor" />
+                  <span>START CUSTOM MATCH</span>
                 </button>
-              </div>
-            </div>
+              </motion.div>
+            )}
 
-            <AnimatePresence mode="wait">
-              {/* ============================================================
-                  MAIN BENTO MENU TAB
-                 ============================================================ */}
-              {activeTab === 'main' && (
-                <motion.div
-                  key="tab-main"
-                  className="home-bento-layout"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* PRIMARY HERO CTA: 1v1 QUICK PLAY */}
+            {/* ============================================================
+                WEBRTC P2P ROOM SUBPANEL
+               ============================================================ */}
+            {activeTab === 'online' && (
+              <motion.div
+                key="nm-tab-online"
+                className="nm-subpanel"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="nm-subpanel-head">
                   <button
                     type="button"
-                    className="bento-hero-play-card"
-                    onClick={() => {
-                      commitNameSave();
-                      onStartQuickPlay('1v1');
-                    }}
+                    className="nm-back-btn"
+                    onClick={() => setActiveTab('main')}
                   >
-                    <div className="bento-hero-left">
-                      <div className="bento-hero-badge">
-                        <Flame size={12} />
-                        <span>INSTANT ACTION • HEADS-UP DUEL</span>
-                      </div>
-                      <div className="bento-hero-heading">
-                        QUICK PLAY (1v1 VS BOT)
-                      </div>
-                      <div className="bento-hero-desc">
-                        Jump straight onto the emerald table against 1 high-stakes AI opponent.
-                      </div>
-                    </div>
-
-                    <div className="bento-hero-cta-circle">
-                      <Play size={20} fill="currentColor" />
-                      <span>DEAL</span>
-                    </div>
+                    <ArrowLeft size={14} />
+                    <span>BACK</span>
                   </button>
+                  <span className="nm-subpanel-title">WEBRTC P2P ROOM</span>
+                </div>
 
-                  {/* 2-COLUMN MODE SELECTION GRID */}
-                  <div className="bento-grid-row">
-                    {/* 1v3 FULL TABLE */}
-                    <button
-                      type="button"
-                      className="bento-tile-card tile-emerald"
-                      onClick={() => {
-                        commitNameSave();
-                        onStartQuickPlay('1v3');
-                      }}
-                    >
-                      <div className="bento-tile-top">
-                        <div className="bento-tile-icon icon-gold">
-                          <Swords size={18} />
-                        </div>
-                        <span className="bento-tile-tag">4 SEATS</span>
-                      </div>
-                      <div className="bento-tile-title">1v3 FULL TABLE</div>
-                      <div className="bento-tile-sub">
-                        Battle 3 AI Sharks simultaneously with full table rotation & chaos.
-                      </div>
-                    </button>
-
-                    {/* WEBRTC P2P MULTIPLAYER */}
-                    <button
-                      type="button"
-                      className="bento-tile-card tile-royal"
-                      onClick={() => {
-                        commitNameSave();
-                        setActiveTab('online');
-                      }}
-                    >
-                      <div className="bento-tile-top">
-                        <div className="bento-tile-icon icon-emerald">
-                          <Globe size={18} />
-                        </div>
-                        <span className="bento-tile-tag tag-live">
-                          {mpRole !== 'offline' ? `ROOM #${roomCode}` : 'LIVE P2P'}
-                        </span>
-                      </div>
-                      <div className="bento-tile-title">PLAY WITH FRIENDS</div>
-                      <div className="bento-tile-sub">
-                        Host a private 0-bot room code or join your friend's invite link.
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* SECONDARY UTILITY ROW: CUSTOM SETUP & RULEBOOK */}
-                  <div className="bento-utility-row">
-                    <button
-                      type="button"
-                      className="bento-secondary-pill"
-                      onClick={() => {
-                        commitNameSave();
-                        setActiveTab('custom');
-                      }}
-                    >
-                      <Settings size={15} className="text-gold" />
-                      <span>CUSTOM TABLE & BOT COUNT</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="bento-secondary-pill"
-                      onClick={() => setActiveTab('rules')}
-                    >
-                      <BookOpen size={15} className="text-gold" />
-                      <span>RULEBOOK & SPECIAL CARDS</span>
-                    </button>
-                  </div>
-
-                  {/* ACTIVE HOUSE RULES FOOTER STRIP */}
-                  <div className="home-active-rules-strip">
-                    <div className="rule-chip">
-                      <Layers size={11} />
-                      <span>MODE: {mode === 'no_mercy' ? 'NO MERCY (+10)' : 'CLASSIC'}</span>
-                    </div>
-                    <div className="rule-chip">
-                      <Sparkles size={11} />
-                      <span>7-0 SWAP: {sevenZeroRule ? 'ACTIVE' : 'OFF'}</span>
-                    </div>
-                    <div className="rule-chip">
-                      <ShieldAlert size={11} />
-                      <span>MERCY KO: 25 CARDS</span>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* ============================================================
-                  CUSTOM MATCH TAB
-                 ============================================================ */}
-              {activeTab === 'custom' && (
-                <motion.div
-                  key="tab-custom"
-                  className="home-subpanel"
-                  initial={{ opacity: 0, x: 14 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -14 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="subpanel-header">
-                    <button
-                      type="button"
-                      className="subpanel-back-btn"
-                      onClick={() => setActiveTab('main')}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>BACK TO LOBBY</span>
-                    </button>
-                    <span className="subpanel-title">CUSTOM TABLE SETUP</span>
-                  </div>
-
-                  <div className="custom-option-group">
-                    <label>OPPONENT SEATING FORMAT</label>
-                    <div className="custom-Segmented-row">
+                {mpRole === 'offline' ? (
+                  <div className="nm-online-stack">
+                    <div className="nm-online-section">
+                      <span className="nm-section-caption">
+                        HOST A PRIVATE ROOM (0 BOTS BY DEFAULT)
+                      </span>
                       <button
                         type="button"
-                        className={`seg-btn ${customPreset === '1v1' ? 'active' : ''}`}
-                        onClick={() => setCustomPreset('1v1')}
-                      >
-                        1v1 (1 BOT)
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-btn ${customPreset === '1v3' ? 'active' : ''}`}
-                        onClick={() => setCustomPreset('1v3')}
-                      >
-                        1v3 (3 BOTS)
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-btn ${
-                          customPreset === 'no_bots' ? 'active' : ''
-                        }`}
-                        onClick={() => setCustomPreset('no_bots')}
-                      >
-                        0 BOTS (MANUAL)
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="custom-option-group">
-                    <label>DECK EDITION</label>
-                    <div className="custom-Segmented-row">
-                      <button
-                        type="button"
-                        className={`seg-btn ${mode === 'no_mercy' ? 'active' : ''}`}
-                        onClick={() => {
-                          if (mode !== 'no_mercy') onToggleMode();
+                        className="nm-btn nm-btn-crimson"
+                        disabled={isBusy}
+                        onClick={async () => {
+                          const finalName = commitNameSave();
+                          setErrorMsg('');
+                          setIsBusy(true);
+                          try {
+                            await onHostOnlineRoom(finalName);
+                          } catch (err: any) {
+                            setErrorMsg(err?.message || 'Could not host room');
+                          } finally {
+                            setIsBusy(false);
+                          }
                         }}
                       >
-                        NO MERCY (+10 / KO)
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-btn ${mode === 'classic' ? 'active' : ''}`}
-                        onClick={() => {
-                          if (mode !== 'classic') onToggleMode();
-                        }}
-                      >
-                        CLASSIC UNO
+                        <Users size={16} />
+                        <span>{isBusy ? 'CREATING ROOM...' : 'HOST PRIVATE ROOM'}</span>
                       </button>
                     </div>
-                  </div>
 
-                  <div className="custom-option-group">
-                    <label>7-0 HAND SWAP & ROTATION</label>
-                    <div className="custom-Segmented-row">
-                      <button
-                        type="button"
-                        className={`seg-btn ${sevenZeroRule ? 'active' : ''}`}
-                        onClick={() => {
-                          if (!sevenZeroRule) onToggleSevenZero();
-                        }}
-                      >
-                        ENABLED (7 SWAP / 0 PASS)
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-btn ${!sevenZeroRule ? 'active' : ''}`}
-                        onClick={() => {
-                          if (sevenZeroRule) onToggleSevenZero();
-                        }}
-                      >
-                        DISABLED
-                      </button>
+                    <div className="nm-divider-line">
+                      <span>OR JOIN WITH CODE</span>
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    className="home-btn home-btn-primary"
-                    onClick={() => {
-                      commitNameSave();
-                      onStartQuickPlay(customPreset);
-                    }}
-                  >
-                    <Play size={16} fill="currentColor" />
-                    <span>LAUNCH CUSTOM TABLE</span>
-                  </button>
-                </motion.div>
-              )}
-
-              {/* ============================================================
-                  WEBRTC P2P ONLINE ROOM TAB
-                 ============================================================ */}
-              {activeTab === 'online' && (
-                <motion.div
-                  key="tab-online"
-                  className="home-subpanel"
-                  initial={{ opacity: 0, x: 14 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -14 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="subpanel-header">
-                    <button
-                      type="button"
-                      className="subpanel-back-btn"
-                      onClick={() => setActiveTab('main')}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>BACK TO LOBBY</span>
-                    </button>
-                    <span className="subpanel-title">WEBRTC P2P PRIVATE LOUNGE</span>
-                  </div>
-
-                  {mpRole === 'offline' ? (
-                    <div className="online-subpanel-options">
-                      <div className="online-card-block">
-                        <div className="block-label">
-                          1. HOST A PRIVATE TABLE (STARTS WITH 0 BOTS FOR FRIENDS)
-                        </div>
+                    <div className="nm-online-section">
+                      <span className="nm-section-caption">
+                        ENTER FRIEND&apos;S 5-CHARACTER ROOM CODE
+                      </span>
+                      <div className="nm-join-bar">
+                        <input
+                          type="text"
+                          className="nm-code-input"
+                          value={joinCodeInput}
+                          onChange={(e) =>
+                            setJoinCodeInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="CODE (e.g. A8K2P)"
+                          maxLength={8}
+                        />
                         <button
                           type="button"
-                          className="home-btn home-btn-primary"
-                          disabled={isBusy}
+                          className="nm-join-submit-btn"
+                          disabled={isBusy || !joinCodeInput.trim()}
                           onClick={async () => {
                             const finalName = commitNameSave();
                             setErrorMsg('');
                             setIsBusy(true);
                             try {
-                              await onHostOnlineRoom(finalName);
+                              await onJoinOnlineRoom(
+                                joinCodeInput.trim(),
+                                finalName
+                              );
                             } catch (err: any) {
-                              setErrorMsg(err?.message || 'Could not host room');
+                              setErrorMsg(
+                                err?.message || 'Could not connect to Host'
+                              );
                             } finally {
                               setIsBusy(false);
                             }
                           }}
                         >
-                          <Users size={16} />
-                          <span>
-                            {isBusy ? 'OPENING ROOM...' : 'CREATE PRIVATE ROOM'}
-                          </span>
+                          {isBusy ? '...' : 'JOIN'}
                         </button>
                       </div>
-
-                      <div className="online-divider">
-                        <span>OR JOIN FRIEND'S TABLE</span>
-                      </div>
-
-                      <div className="online-card-block">
-                        <div className="block-label">
-                          2. ENTER 5-LETTER ROOM CODE (MAKE SURE YOUR NAME IS SAVED ABOVE)
-                        </div>
-                        <div className="online-join-row">
-                          <input
-                            type="text"
-                            className="home-code-field"
-                            value={joinCodeInput}
-                            onChange={(e) =>
-                              setJoinCodeInput(e.target.value.toUpperCase())
-                            }
-                            placeholder="CODE (e.g. X7B9Q)"
-                            maxLength={8}
-                          />
-                          <button
-                            type="button"
-                            className="home-btn home-btn-emerald"
-                            disabled={isBusy || !joinCodeInput.trim()}
-                            onClick={async () => {
-                              const finalName = commitNameSave();
-                              setErrorMsg('');
-                              setIsBusy(true);
-                              try {
-                                await onJoinOnlineRoom(
-                                  joinCodeInput.trim(),
-                                  finalName
-                                );
-                              } catch (err: any) {
-                                setErrorMsg(
-                                  err?.message || 'Could not connect to Host'
-                                );
-                              } finally {
-                                setIsBusy(false);
-                              }
-                            }}
-                          >
-                            <span>{isBusy ? 'JOINING...' : 'JOIN TABLE'}</span>
-                          </button>
-                        </div>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="online-lobby-ready-box">
-                      <div className="lobby-code-label">
-                        {mpRole === 'host'
-                          ? 'ROOM LIVE — SHARE INVITE CODE WITH FRIENDS'
-                          : 'CONNECTED TO HOST TABLE'}
-                      </div>
-                      <div className="lobby-code-giant">#{roomCode}</div>
-                      <div className="lobby-connected-status">
-                        {mpStatusText} • {connectedFriendsCount + 1} Player(s) Seated
-                      </div>
+                  </div>
+                ) : (
+                  <div className="nm-lobby-active-card">
+                    <span className="nm-lobby-tag">
+                      {mpRole === 'host'
+                        ? 'ROOM ACTIVE • SHARE CODE WITH FRIENDS'
+                        : 'CONNECTED TO P2P ROOM'}
+                    </span>
+                    <div className="nm-lobby-code">#{roomCode}</div>
+                    <div className="nm-lobby-meta">
+                      {mpStatusText} • {connectedFriendsCount + 1} Player(s) Ready
+                    </div>
 
-                      <div className="lobby-action-pair">
-                        {mpRole === 'host' && (
-                          <button
-                            type="button"
-                            className="home-btn home-btn-secondary"
-                            onClick={handleCopyInvite}
-                          >
-                            {copiedLink ? <Check size={15} /> : <Copy size={15} />}
-                            <span>
-                              {copiedLink
-                                ? 'INVITE LINK COPIED!'
-                                : 'COPY INVITE LINK'}
-                            </span>
-                          </button>
-                        )}
+                    <div className="nm-lobby-actions">
+                      {mpRole === 'host' && (
                         <button
                           type="button"
-                          className="home-btn home-btn-primary"
-                          onClick={() => {
-                            commitNameSave();
-                            onEnterOnlineTable();
-                          }}
+                          className="nm-btn nm-btn-slate"
+                          onClick={handleCopyInvite}
                         >
-                          <Play size={16} fill="currentColor" />
-                          <span>ENTER BILLIARDS TABLE</span>
+                          {copiedLink ? <Check size={15} /> : <Copy size={15} />}
+                          <span>
+                            {copiedLink ? 'INVITE LINK COPIED!' : 'COPY INVITE LINK'}
+                          </span>
                         </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {errorMsg && <div className="home-error-banner">{errorMsg}</div>}
-                </motion.div>
-              )}
-
-              {/* ============================================================
-                  RULEBOOK & SPECIAL CARDS TAB
-                 ============================================================ */}
-              {activeTab === 'rules' && (
-                <motion.div
-                  key="tab-rules"
-                  className="home-subpanel"
-                  initial={{ opacity: 0, x: 14 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -14 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="subpanel-header">
-                    <button
-                      type="button"
-                      className="subpanel-back-btn"
-                      onClick={() => setActiveTab('main')}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>BACK TO LOBBY</span>
-                    </button>
-                    <span className="subpanel-title">NO MERCY HOUSE RULES</span>
-                  </div>
-
-                  <div className="rules-grid-cards">
-                    <div className="rule-mini-card">
-                      <span className="rule-badge badge-crimson">25+ KO</span>
-                      <div className="rule-mini-title">Mercy Elimination</div>
-                      <p>Hold 25 or more cards at any point and you are immediately knocked out!</p>
-                    </div>
-
-                    <div className="rule-mini-card">
-                      <span className="rule-badge badge-gold">STACKING</span>
-                      <div className="rule-mini-title">Penalty Stacking</div>
-                      <p>Stack equal or higher draw cards (+2 → +4 → +6 → +10) to pass the pain.</p>
-                    </div>
-
-                    <div className="rule-mini-card">
-                      <span className="rule-badge badge-emerald">7 & 0</span>
-                      <div className="rule-mini-title">7 Swap / 0 Rotate</div>
-                      <p>Play a 7 to swap hands with anyone; play a 0 to rotate every hand!</p>
-                    </div>
-
-                    <div className="rule-mini-card">
-                      <span className="rule-badge badge-royal">ROULETTE</span>
-                      <div className="rule-mini-title">Color Roulette</div>
-                      <p>Next player flips cards from the deck until they reveal the chosen color.</p>
+                      )}
+                      <button
+                        type="button"
+                        className="nm-btn nm-btn-crimson"
+                        onClick={() => {
+                          commitNameSave();
+                          onEnterOnlineTable();
+                        }}
+                      >
+                        <Play size={15} fill="currentColor" />
+                        <span>ENTER GAME TABLE</span>
+                      </button>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                )}
+
+                {errorMsg && <div className="nm-error-box">{errorMsg}</div>}
+              </motion.div>
+            )}
+
+            {/* ============================================================
+                BATTLE CAREER SUBPANEL
+               ============================================================ */}
+            {activeTab === 'career' && (
+              <motion.div
+                key="nm-tab-career"
+                className="nm-subpanel"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="nm-subpanel-head">
+                  <button
+                    type="button"
+                    className="nm-back-btn"
+                    onClick={() => setActiveTab('main')}
+                  >
+                    <ArrowLeft size={14} />
+                    <span>BACK</span>
+                  </button>
+                  <span className="nm-subpanel-title">BATTLE CAREER</span>
+                </div>
+
+                <div className="nm-career-rank-banner">
+                  <div className="nm-rank-icon">🏆</div>
+                  <div className="nm-rank-info">
+                    <span className="nm-rank-tier">NO MERCY CONTENDER</span>
+                    <strong className="nm-rank-player">
+                      {nameInput.trim() || savedName || 'Commander'}
+                    </strong>
+                  </div>
+                  <span className="nm-rank-badge">SEASON 1</span>
+                </div>
+
+                <div className="nm-career-grid">
+                  <div className="nm-stat-box">
+                    <span className="nm-stat-value">NO MERCY</span>
+                    <span className="nm-stat-label">PREFERRED EDITION</span>
+                  </div>
+                  <div className="nm-stat-box">
+                    <span className="nm-stat-value">25 CARDS</span>
+                    <span className="nm-stat-label">ELIMINATION LIMIT</span>
+                  </div>
+                  <div className="nm-stat-box">
+                    <span className="nm-stat-value">+10 WILD</span>
+                    <span className="nm-stat-label">MAX STACK PENALTY</span>
+                  </div>
+                  <div className="nm-stat-box">
+                    <span className="nm-stat-value">WEBRTC P2P</span>
+                    <span className="nm-stat-label">MULTIPLAYER ENGINE</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ============================================================
+                RULEBOOK & CARDS SUBPANEL
+               ============================================================ */}
+            {activeTab === 'rules' && (
+              <motion.div
+                key="nm-tab-rules"
+                className="nm-subpanel"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="nm-subpanel-head">
+                  <button
+                    type="button"
+                    className="nm-back-btn"
+                    onClick={() => setActiveTab('main')}
+                  >
+                    <ArrowLeft size={14} />
+                    <span>BACK</span>
+                  </button>
+                  <span className="nm-subpanel-title">RULEBOOK &amp; CARDS</span>
+                </div>
+
+                <div className="nm-rules-cards-list">
+                  <div className="nm-rule-item">
+                    <span className="nm-rule-pill pill-rose">25+ KO</span>
+                    <div>
+                      <strong>Mercy Rule Elimination</strong>
+                      <p>Reach 25 or more cards in your hand and you are eliminated on the spot.</p>
+                    </div>
+                  </div>
+
+                  <div className="nm-rule-item">
+                    <span className="nm-rule-pill pill-amber">+2 TO +10</span>
+                    <div>
+                      <strong>Ruthless Penalty Stacking</strong>
+                      <p>Stack equal or higher draw cards (+2, +4, +6, +10) to pass the total penalty to the next player.</p>
+                    </div>
+                  </div>
+
+                  <div className="nm-rule-item">
+                    <span className="nm-rule-pill pill-cyan">7 &amp; 0</span>
+                    <div>
+                      <strong>7 Hand Swap &amp; 0 Table Rotate</strong>
+                      <p>Playing a 7 swaps your hand with a chosen player. Playing a 0 rotates every hand in turn order.</p>
+                    </div>
+                  </div>
+
+                  <div className="nm-rule-item">
+                    <span className="nm-rule-pill pill-emerald">ROULETTE</span>
+                    <div>
+                      <strong>Wild Color Roulette</strong>
+                      <p>Choose a color—the next player draws from the deck until they reveal a card of that color.</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>
