@@ -65,7 +65,6 @@ export const MusicControls: React.FC<MusicControlsProps> = ({ compact = false })
       className={`bgm-control-capsule ${compact ? 'bgm-capsule-compact' : ''} ${
         musicMuted ? 'is-bgm-muted' : 'is-bgm-playing'
       }`}
-      title="100% Copyright-Free Background Music Controls (Looping)"
     >
       {/* Mute / Unmute Music Button */}
       <button
@@ -73,7 +72,6 @@ export const MusicControls: React.FC<MusicControlsProps> = ({ compact = false })
         className={`bgm-mute-toggle-btn ${musicMuted ? 'muted' : 'active'}`}
         onClick={handleToggleMusicMute}
         aria-label={musicMuted ? 'Unmute Background Music' : 'Mute Background Music'}
-        title={musicMuted ? 'Unmute Background Music' : 'Mute Background Music'}
       >
         {musicMuted ? (
           <VolumeX size={14} />
@@ -96,7 +94,6 @@ export const MusicControls: React.FC<MusicControlsProps> = ({ compact = false })
         onClick={() => handleStepVolume(-0.1)}
         disabled={musicMuted && musicVolume <= 0}
         aria-label="Reduce Music Volume"
-        title="Reduce Music Volume (-10%)"
       >
         <Minus size={12} />
       </button>
@@ -122,17 +119,15 @@ export const MusicControls: React.FC<MusicControlsProps> = ({ compact = false })
         className="bgm-vol-step-btn"
         onClick={() => handleStepVolume(0.1)}
         aria-label="Increase Music Volume"
-        title="Increase Music Volume (+10%)"
       >
         <Plus size={12} />
       </button>
 
-      {/* Copyright-Free Track Switcher */}
+      {/* Track Switcher Button (No hover title tooltip) */}
       <button
         type="button"
         className="bgm-track-cycle-btn"
         onClick={handleNextTrack}
-        title={`Switch Copyright-Free Loop (Current: ${track.name})`}
       >
         <Disc3 size={12} className={!musicMuted ? 'spin-disc' : ''} />
         <span className="bgm-track-label">{track.name}</span>
