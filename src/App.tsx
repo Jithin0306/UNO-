@@ -785,11 +785,54 @@ export function App() {
     }
   };
 
-  // AI Turn Controller (runs only when offline or Host, and only for seats where isAI === true)
+  // Keep latest AI execution logic in a ref so the 5-10s timer is never reset by unrelated renders
+  const runAiTurnRef = useRef<() => void>(() => {});
+  runAiTurnRef.current = () => {
+    const activeSeatPlayer = players[turnIndex];
+    if (!activeSeatPlayer || !activeSeatPlayer.isAI) return;
+
+    const topCard = discardPile[discardPile.length - 1];
+    const playableCards = activeSeatPlayer.hand.filter((c) =>
+      canPlayCard(c, topCard, activeColor, pendingPenalty)
+    );
+
+    if (playableCards.length > 0) {
+      const nonWilds = playableCards.filter((c) => c.color !== 'wild');
+      const chosenCard =
+        nonWilds.length > 0 ? nonWilds[0] : playableCards[0];
+
+      let preferredColor: ActiveColor = 'red';
+      if (chosenCard.color === 'wild') {
+        const counts: Record<ActiveColor, number> = {
+          red: 0,
+          blue: 0,
+          green: 0,
+          yellow: 0,
+        };
+        activeSeatPlayer.hand.forEach((c) => {
+          if (c.color !== 'wild') {
+            counts[c.color as ActiveColor]++;
+          }
+        });
+        preferredColor = (Object.keys(counts) as ActiveColor[]).reduce(
+          (a, b) => (counts[a] >= counts[b] ? a : b),
+          'red' as ActiveColor
+        );
+      }
+
+      commitCardPlay(turnIndex, chosenCard, preferredColor);
+    } else {
+      executePlayerDraw(turnIndex);
+    }
+  };
+
+  // AI Turn Controller: bots take 5 to 10 seconds (5000ms - 10000ms) per turn
+  const activeSeatIsAI = players[turnIndex]?.isAI ?? false;
   useEffect(() => {
     if (
       mpRole === 'client' ||
       players.length === 0 ||
+      !activeSeatIsAI ||
       winner ||
       awaitingSevenSwapForSeat !== null ||
       pendingWildCard
@@ -797,44 +840,12 @@ export function App() {
       return;
     }
 
-    const activeSeatPlayer = players[turnIndex];
-    if (!activeSeatPlayer || !activeSeatPlayer.isAI) return;
+    // Randomize bot thinking time between 5,000ms (5s) and 10,000ms (10s)
+    const botThinkDelayMs = 5000 + Math.floor(Math.random() * 5001);
 
     aiTimerRef.current = window.setTimeout(() => {
-      const topCard = discardPile[discardPile.length - 1];
-      const playableCards = activeSeatPlayer.hand.filter((c) =>
-        canPlayCard(c, topCard, activeColor, pendingPenalty)
-      );
-
-      if (playableCards.length > 0) {
-        const nonWilds = playableCards.filter((c) => c.color !== 'wild');
-        const chosenCard =
-          nonWilds.length > 0 ? nonWilds[0] : playableCards[0];
-
-        let preferredColor: ActiveColor = 'red';
-        if (chosenCard.color === 'wild') {
-          const counts: Record<ActiveColor, number> = {
-            red: 0,
-            blue: 0,
-            green: 0,
-            yellow: 0,
-          };
-          activeSeatPlayer.hand.forEach((c) => {
-            if (c.color !== 'wild') {
-              counts[c.color as ActiveColor]++;
-            }
-          });
-          preferredColor = (Object.keys(counts) as ActiveColor[]).reduce(
-            (a, b) => (counts[a] >= counts[b] ? a : b),
-            'red' as ActiveColor
-          );
-        }
-
-        commitCardPlay(turnIndex, chosenCard, preferredColor);
-      } else {
-        executePlayerDraw(turnIndex);
-      }
-    }, 1050);
+      runAiTurnRef.current();
+    }, botThinkDelayMs);
 
     return () => {
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
@@ -842,15 +853,12 @@ export function App() {
   }, [
     mpRole,
     turnIndex,
-    players,
-    discardPile,
-    activeColor,
-    pendingPenalty,
+    activeSeatIsAI,
+    discardPile.length,
+    drawPile.length,
     winner,
     awaitingSevenSwapForSeat,
     pendingWildCard,
-    commitCardPlay,
-    executePlayerDraw,
   ]);
 
   if (players.length < 4 || discardPile.length === 0) {
