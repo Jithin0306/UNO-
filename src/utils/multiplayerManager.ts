@@ -67,6 +67,10 @@ export type ClientActionMessage =
       seatIndex: number;
       playerName: string;
       avatarUrl?: string;
+    }
+  | {
+      type: 'REQUEST_REMATCH';
+      seatIndex: number;
     };
 
 export interface HostBroadcastMessage {

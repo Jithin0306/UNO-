@@ -278,7 +278,7 @@ export function App() {
           const isActive = customActiveMask
             ? customActiveMask[idx]
             : existing
-            ? existing.isActive
+            ? existing.isActive || Boolean(existing.isEliminated)
             : true;
           return {
             ...meta,
@@ -295,8 +295,10 @@ export function App() {
                 ? meta.avatarUrl
                 : existing?.avatarUrl || meta.avatarUrl,
             title:
-              existing && !existing.isEliminated && !isSeatAI
-                ? existing.title
+              existing && !isSeatAI
+                ? existing.isEliminated
+                  ? 'ONLINE FRIEND'
+                  : existing.title
                 : meta.title,
             isAI: isSeatAI,
             isActive: idx === 0 ? true : isActive,
@@ -1288,6 +1290,8 @@ export function App() {
               : p
           )
         );
+      } else if (msg.type === 'REQUEST_REMATCH') {
+        startNewMatch(mode);
       }
     };
 
@@ -1984,6 +1988,16 @@ export function App() {
               }
             }}
             onSelectWildColor={handleSelectWildColor}
+            onRematch={() => {
+              if (mpRole === 'client') {
+                mpManager.sendActionToHost({
+                  type: 'REQUEST_REMATCH',
+                  seatIndex: mySeatIndex,
+                });
+              } else {
+                startNewMatch(mode);
+              }
+            }}
             onNewMatch={() => {
               setShowHomeScreen(true);
             }}

@@ -63,6 +63,7 @@ interface GameHUDProps {
   onCallUno: () => void;
   onDrawCard: () => void;
   onSelectWildColor: (color: ActiveColor) => void;
+  onRematch: () => void;
   onNewMatch: () => void;
 }
 
@@ -102,6 +103,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onCallUno,
   onDrawCard,
   onSelectWildColor,
+  onRematch,
   onNewMatch,
 }) => {
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -110,7 +112,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [avatarUpdatedToast, setAvatarUpdatedToast] = useState(false);
+  const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const hudFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Reset dismissed state whenever a new winner is crowned or match resets
+  useEffect(() => {
+    setWinnerModalDismissed(false);
+  }, [winner?.id]);
 
   // When an invite link (?room=XXXXX) is opened, automatically pop open the modal with the code pre-filled so the friend enters their name!
   useEffect(() => {
@@ -337,6 +345,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             )}
             <span className="turn-wing right-wing" />
           </div>
+
+          {winner && winnerModalDismissed && (
+            <div className="dismissed-winner-rematch-row">
+              <button
+                type="button"
+                className="victory-inline-rematch-btn"
+                onClick={onRematch}
+              >
+                <RotateCcw size={14} />
+                <span>REMATCH / PLAY AGAIN</span>
+              </button>
+              <button
+                type="button"
+                className="victory-inline-reopen-btn"
+                onClick={() => setWinnerModalDismissed(false)}
+              >
+                <span>SHOW RESULT</span>
+              </button>
+            </div>
+          )}
 
           {activeTotalPlayers >= 2 && !winner && (
             <div className="turn-timer-progress-track">
@@ -798,7 +826,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* SUBTLE VICTORY / MERCY KNOCKOUT OVERLAY WHEN A ROUND COMPLETES */}
       <AnimatePresence>
-        {winner && (
+        {winner && !winnerModalDismissed && (
           <motion.div
             key="victory-modal"
             className="victory-table-backdrop"
@@ -811,9 +839,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               initial={{ y: 30, scale: 0.92 }}
               animate={{ y: 0, scale: 1 }}
             >
+              <button
+                type="button"
+                className="victory-close-x-btn"
+                onClick={() => setWinnerModalDismissed(true)}
+                aria-label="Dismiss Match Result"
+              >
+                ✕
+              </button>
+
               <div className="victory-eyebrow">
                 {winner.hand.length > 0
-                  ? '💀 MERCY RULE (25+ CARDS ELIMINATION)'
+                  ? '💀 MERCY RULE / ELIMINATION KNOCKOUT'
                   : 'MATCH COMPLETE'}
               </div>
               <h2 className="victory-headline">
@@ -828,22 +865,31 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <p className="victory-sub">
                 {winner.seat === 'bottom'
                   ? winner.hand.length > 0
-                    ? 'Every opponent reached 25+ cards and was knocked out by the Mercy Rule! (+250 KO Bonus)'
+                    ? 'Every opponent was eliminated by the Mercy / AFK Rule! (+250 KO Bonus)'
                     : 'You cleared your final card across the emerald felt.'
                   : winner.hand.length > 0
-                  ? 'You reached 25 or more cards in your hand and were eliminated by the No Mercy Rule!'
+                  ? `${winner.name} is the last survivor standing at the table!`
                   : `${winner.name} emptied their hand first.`}
               </p>
-              {mpRole !== 'client' && (
+
+              <div className="victory-actions-row">
                 <button
                   type="button"
                   className="victory-deal-btn"
-                  onClick={onNewMatch}
+                  onClick={onRematch}
                 >
                   <RotateCcw size={16} />
-                  <span>DEAL NEXT MATCH</span>
+                  <span>REMATCH / PLAY AGAIN</span>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  className="victory-dismiss-btn"
+                  onClick={() => setWinnerModalDismissed(true)}
+                >
+                  <span>DISMISS</span>
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

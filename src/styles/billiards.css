@@ -4116,6 +4116,135 @@ body,
   }
 }
 
+/* ============================================================================
+   VICTORY / LOSS MODAL REMATCH & DISMISS CONTROLS
+   ============================================================================ */
+
+.victory-billiards-plaque {
+  position: relative;
+}
+
+.victory-close-x-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(15, 29, 22, 0.85);
+  color: rgba(226, 232, 240, 0.85);
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.victory-close-x-btn:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-champagne);
+  background: rgba(30, 58, 42, 0.95);
+  transform: scale(1.06);
+}
+
+.victory-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.victory-actions-row .victory-deal-btn {
+  margin-top: 0;
+}
+
+.victory-dismiss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background: rgba(6, 20, 14, 0.85);
+  color: rgba(226, 232, 240, 0.9);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.victory-dismiss-btn:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-champagne);
+  background: rgba(14, 42, 29, 0.95);
+}
+
+.dismissed-winner-rematch-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+  pointer-events: auto;
+}
+
+.victory-inline-rematch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--gold-bright);
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  color: #02100a;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  box-shadow:
+    0 0 18px rgba(245, 158, 11, 0.55),
+    0 6px 14px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.victory-inline-rematch-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow:
+    0 0 26px rgba(251, 191, 36, 0.85),
+    0 8px 18px rgba(0, 0, 0, 0.9);
+}
+
+.victory-inline-reopen-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(3, 14, 9, 0.88);
+  color: rgba(226, 232, 240, 0.88);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.victory-inline-reopen-btn:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-champagne);
+}
+
+
 
 
 
