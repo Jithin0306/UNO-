@@ -2,6 +2,7 @@ import Peer, { DataConnection } from 'peerjs';
 import {
   ActiveColor,
   CardFlight,
+  EliminationEvent,
   GameMode,
   Player,
   TableSpecialEffect,
@@ -30,8 +31,10 @@ export interface SyncedTableState {
   skippedPlayerId: string | null;
   awaitingSevenSwapForSeat: number | null;
   winner: Player | null;
+  turnSecondsLeft?: number;
   latestFlight?: NetworkFlightEvent | null;
   latestEffect?: TableSpecialEffect | null;
+  latestElimination?: EliminationEvent | null;
 }
 
 export type ClientActionMessage =

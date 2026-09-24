@@ -50,9 +50,21 @@ export interface Player {
   isActive: boolean;
   calledUno: boolean;
   isEliminated?: boolean;
+  /** Number of 60-second turn timeouts accumulated by this player (3 = Eliminated) */
+  afkCount?: number;
 }
 
 export type GameMode = 'no_mercy' | 'classic';
+
+export interface EliminationEvent {
+  id: string;
+  playerId: string;
+  playerName: string;
+  avatarUrl: string;
+  reason: 'mercy_25_cards' | 'afk_3_rounds';
+  cardCount: number;
+  survivorsLeft: number;
+}
 
 export interface CardFlight {
   id: string;

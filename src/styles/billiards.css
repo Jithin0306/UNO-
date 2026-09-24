@@ -3525,6 +3525,379 @@ body,
   }
 }
 
+/* ============================================================================
+   1-MINUTE TURN COUNTDOWN TIMER & PROGRESS BAR
+   ============================================================================ */
+
+.table-integrated-turn-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 22px;
+  pointer-events: none;
+}
+
+.turn-banner-main-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.turn-countdown-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', 'Outfit', monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: rgba(3, 14, 9, 0.88);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.25s ease;
+}
+
+.turn-countdown-timer-pill.timer-warning {
+  border-color: rgba(251, 191, 36, 0.65);
+  color: #fde047;
+  background: rgba(28, 19, 4, 0.9);
+  box-shadow:
+    0 0 14px rgba(251, 191, 36, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.8);
+}
+
+.turn-countdown-timer-pill.timer-critical {
+  border-color: rgba(239, 68, 68, 0.85);
+  color: #fca5a5;
+  background: rgba(45, 8, 8, 0.92);
+  box-shadow:
+    0 0 18px rgba(239, 68, 68, 0.65),
+    0 4px 12px rgba(0, 0, 0, 0.85);
+  animation: timer-critical-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes timer-critical-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+  }
+  100% {
+    transform: scale(1.08);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.95);
+  }
+}
+
+.turn-timer-progress-track {
+  width: 220px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(2, 10, 7, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.turn-timer-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  transition: width 0.45s linear, background 0.3s ease;
+}
+
+.turn-timer-progress-fill.timer-warning {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.75);
+}
+
+.turn-timer-progress-fill.timer-critical {
+  background: linear-gradient(90deg, #dc2626, #f87171);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.95);
+}
+
+/* ============================================================================
+   AFK WARNING STRIKE PILLS & ELIMINATED SEAT TOMBSTONES
+   ============================================================================ */
+
+.your-afk-warning-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(69, 10, 10, 0.88);
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
+  animation: timer-critical-pulse 1s ease-in-out infinite alternate;
+}
+
+.opponent-afk-badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #991b1b, #dc2626);
+  border: 1px solid #fca5a5;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  z-index: 6;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.85);
+}
+
+.opponent-seat-wrapper.is-eliminated-seat {
+  opacity: 0.74;
+  filter: saturate(0.25);
+  transition: all 0.4s ease;
+}
+
+.eliminated-pill-frame {
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  background: linear-gradient(180deg, rgba(28, 6, 6, 0.92), rgba(10, 4, 4, 0.96)) !important;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.85),
+    inset 0 0 16px rgba(220, 38, 38, 0.22) !important;
+}
+
+.eliminated-avatar-ring {
+  position: relative;
+  border-color: #ef4444 !important;
+  filter: grayscale(1) contrast(1.15);
+}
+
+.eliminated-x-stamp {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(127, 29, 29, 0.62);
+  color: #fecaca;
+  font-weight: 900;
+  font-size: 18px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+  border-radius: 50%;
+}
+
+.eliminated-strike {
+  text-decoration: line-through;
+  color: rgba(248, 113, 113, 0.85) !important;
+}
+
+.status-eliminated-tag {
+  color: #f87171 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.8px;
+}
+
+/* ============================================================================
+   FULL-STAGE CINEMATIC ELIMINATION ANIMATION OVERLAY
+   ============================================================================ */
+
+.elimination-cinema-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    circle at center,
+    rgba(127, 29, 29, 0.58) 0%,
+    rgba(15, 3, 3, 0.88) 65%,
+    rgba(2, 6, 4, 0.95) 100%
+  );
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.elim-shockwave-ring {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  border: 3px solid rgba(239, 68, 68, 0.85);
+  box-shadow:
+    0 0 45px rgba(239, 68, 68, 0.75),
+    inset 0 0 35px rgba(239, 68, 68, 0.45);
+  pointer-events: none;
+}
+
+.elim-shockwave-secondary {
+  border-width: 2px;
+  border-color: rgba(251, 191, 36, 0.75);
+  box-shadow: 0 0 35px rgba(251, 191, 36, 0.55);
+}
+
+.elim-flying-card-shard {
+  position: absolute;
+  width: 44px;
+  height: 64px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%);
+  border: 1.5px solid rgba(254, 202, 202, 0.75);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+.elim-flying-card-shard:nth-child(even) {
+  background: linear-gradient(135deg, #f59e0b 0%, #78350f 100%);
+  border-color: rgba(253, 230, 138, 0.8);
+}
+
+.elimination-showcase-card {
+  position: relative;
+  width: min(460px, 90vw);
+  padding: 28px 30px 26px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.32), transparent 68%),
+    linear-gradient(180deg, rgba(24, 6, 8, 0.96) 0%, rgba(9, 3, 4, 0.98) 100%);
+  border: 2px solid rgba(248, 113, 113, 0.68);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.95),
+    0 0 60px rgba(220, 38, 38, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.elim-header-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(153, 27, 27, 0.78);
+  border: 1px solid rgba(252, 165, 165, 0.65);
+  color: #fef2f2;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.45);
+}
+
+.elim-avatar-stage {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  margin: 6px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.elim-avatar-ring {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  padding: 4px;
+  background: linear-gradient(135deg, #ef4444, #991b1b, #fbbf24);
+  box-shadow:
+    0 0 32px rgba(239, 68, 68, 0.7),
+    0 12px 24px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.elim-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: grayscale(0.65) contrast(1.15);
+}
+
+.elim-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #450a0a, #111827);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 800;
+  color: #fca5a5;
+}
+
+.elim-giant-x-stamp {
+  position: absolute;
+  inset: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 86px;
+  font-weight: 900;
+  color: #ef4444;
+  text-shadow:
+    0 0 28px rgba(239, 68, 68, 0.95),
+    0 6px 16px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+
+.elim-knockout-ribbon {
+  padding: 4px 20px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.92), transparent);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  text-shadow:
+    0 0 20px rgba(254, 202, 202, 0.85),
+    0 4px 10px rgba(0, 0, 0, 0.95);
+}
+
+.elim-player-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--gold-champagne);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+.elim-reason-description {
+  margin: 0;
+  max-width: 360px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.elim-survivor-pill {
+  margin-top: 4px;
+  padding: 5px 16px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+}
+
+
 
 
 

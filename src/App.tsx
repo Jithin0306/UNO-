@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ActiveColor,
   CardFlight,
+  EliminationEvent,
   GameMode,
   Player,
   SeatPosition,
@@ -132,6 +133,8 @@ export function App() {
   const [discardPile, setDiscardPile] = useState<UnoCardData[]>([]);
   const [activeColor, setActiveColor] = useState<ActiveColor>('green');
   const [turnIndex, setTurnIndex] = useState<number>(0);
+  const [turnTick, setTurnTick] = useState<number>(0);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number>(60);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [pendingPenalty, setPendingPenalty] = useState<number>(0);
   const [skippedPlayerId, setSkippedPlayerId] = useState<string | null>(null);
@@ -170,16 +173,21 @@ export function App() {
     number | null
   >(null);
 
-  // Choreographed flight & table special effects
+  // Choreographed flight, table special effects & full-stage elimination animation
   const [flights, setFlights] = useState<CardFlight[]>([]);
   const [effects, setEffects] = useState<TableSpecialEffect[]>([]);
+  const [activeElimination, setActiveElimination] =
+    useState<EliminationEvent | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
 
   const latestFlightRef = useRef<NetworkFlightEvent | null>(null);
   const latestEffectRef = useRef<TableSpecialEffect | null>(null);
+  const latestEliminationRef = useRef<EliminationEvent | null>(null);
   const seenFlightIdRef = useRef<string>('');
   const seenEffectIdRef = useRef<string>('');
+  const seenEliminationIdRef = useRef<string>('');
   const aiTimerRef = useRef<number | null>(null);
+  const elimTimerRef = useRef<number | null>(null);
 
   const triggerTableEffect = useCallback(
     (effect: Omit<TableSpecialEffect, 'id'>) => {
@@ -191,6 +199,24 @@ export function App() {
       window.setTimeout(() => {
         setEffects((prev) => prev.filter((e) => e.id !== id));
       }, 1150);
+    },
+    []
+  );
+
+  const triggerEliminationBanner = useCallback(
+    (elim: Omit<EliminationEvent, 'id'>) => {
+      const id = `elim-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const fullElim: EliminationEvent = { ...elim, id };
+      latestEliminationRef.current = fullElim;
+      seenEliminationIdRef.current = id;
+      soundFX.playSpecialEffect('elimination');
+      setActiveElimination(fullElim);
+      if (elimTimerRef.current) {
+        window.clearTimeout(elimTimerRef.current);
+      }
+      elimTimerRef.current = window.setTimeout(() => {
+        setActiveElimination((prev) => (prev?.id === id ? null : prev));
+      }, 3900);
     },
     []
   );
@@ -275,6 +301,7 @@ export function App() {
             isAI: isSeatAI,
             isActive: idx === 0 ? true : isActive,
             isEliminated: false,
+            afkCount: 0,
             hand:
               idx === 0
                 ? deal.playerHand
@@ -288,11 +315,14 @@ export function App() {
       setDiscardPile(deal.discardPile);
       setActiveColor(deal.initialColor);
       setTurnIndex(0);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
       setDirection(1);
       setPendingPenalty(0);
       setPendingWildCard(null);
       setAwaitingSevenSwapForSeat(null);
       setSkippedPlayerId(null);
+      setActiveElimination(null);
       setWinner(null);
     },
     [mode, myPlayerName, myAvatarUrl]
@@ -311,6 +341,7 @@ export function App() {
 
     return () => {
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
+      if (elimTimerRef.current) window.clearTimeout(elimTimerRef.current);
     };
   }, []);
 
@@ -330,8 +361,10 @@ export function App() {
         skippedPlayerId,
         awaitingSevenSwapForSeat,
         winner,
+        turnSecondsLeft,
         latestFlight: latestFlightRef.current,
         latestEffect: latestEffectRef.current,
+        latestElimination: latestEliminationRef.current,
       };
       mpManager.broadcastState(statePayload);
     }
@@ -344,6 +377,7 @@ export function App() {
     discardPile,
     activeColor,
     turnIndex,
+    turnSecondsLeft,
     direction,
     pendingPenalty,
     skippedPlayerId,
@@ -516,17 +550,20 @@ export function App() {
 
       let deckPool = [...currentDeck];
       const eliminatedNames: string[] = [];
+      const eliminatedRecords: Array<{ player: Player; cardCount: number }> = [];
 
       const survivorsUpdated = candidatePlayers.map((p) => {
         if (p.isActive && !p.isEliminated && p.hand.length >= 25) {
-          eliminatedNames.push(`${p.name} (${p.hand.length} cards)`);
+          const heldCount = p.hand.length;
+          eliminatedNames.push(`${p.name} (${heldCount} cards)`);
+          eliminatedRecords.push({ player: p, cardCount: heldCount });
           // Official Rulebook: "Set aside their hand of cards until the deck runs out and needs to be reshuffled."
           deckPool = [...deckPool, ...p.hand];
           return {
             ...p,
             isActive: false,
             isEliminated: true,
-            title: `KNOCKED OUT (${p.hand.length} CARDS)`,
+            title: `MERCY KO (${heldCount} CARDS)`,
             hand: [],
             calledUno: false,
           };
@@ -537,6 +574,18 @@ export function App() {
       const remainingActive = survivorsUpdated.filter(
         (p) => p.isActive && !p.isEliminated
       );
+
+      if (eliminatedRecords.length > 0) {
+        const lastElim = eliminatedRecords[eliminatedRecords.length - 1];
+        triggerEliminationBanner({
+          playerId: lastElim.player.id,
+          playerName: lastElim.player.name,
+          avatarUrl: lastElim.player.avatarUrl,
+          reason: 'mercy_25_cards',
+          cardCount: lastElim.cardCount,
+          survivorsLeft: remainingActive.length,
+        });
+      }
 
       let mercyWinner: Player | null = null;
       if (eliminatedNames.length > 0 && remainingActive.length === 1) {
@@ -550,7 +599,7 @@ export function App() {
         mercyWinner,
       };
     },
-    [mode]
+    [mode, triggerEliminationBanner]
   );
 
   // Continuous safety guard: if any active player ever holds >= 25 cards in No Mercy mode, immediately eliminate them
@@ -579,6 +628,8 @@ export function App() {
       });
       setDrawPile(reshuffledDeck);
       setPlayers(survivorsUpdated);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
       if (mercyWinner) {
         setWinner(mercyWinner);
         soundFX.playSpecialEffect('win');
@@ -603,7 +654,8 @@ export function App() {
     (
       playerIdx: number,
       card: UnoCardData,
-      chosenWildColor?: ActiveColor
+      chosenWildColor?: ActiveColor,
+      overrideAfkCount?: number
     ) => {
       const actingPlayer = players[playerIdx];
       if (!actingPlayer || !actingPlayer.isActive) return;
@@ -646,11 +698,15 @@ export function App() {
           ...p,
           hand: sortHandCards(remaining),
           calledUno: remaining.length === 1 ? p.calledUno : false,
+          afkCount:
+            overrideAfkCount !== undefined ? overrideAfkCount : p.afkCount ?? 0,
         };
       });
 
       setDiscardPile((prev) => [...prev.slice(-14), playedCardWithMeta]);
       setActiveColor(nextColor);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
 
       if (nextPlayers[playerIdx].hand.length === 0) {
         setPlayers(nextPlayers);
@@ -827,7 +883,7 @@ export function App() {
       }
 
       if ((sevenZeroRule || mode === 'no_mercy') && card.value === '7') {
-        if (!actingPlayer.isAI) {
+        if (!actingPlayer.isAI && overrideAfkCount === undefined) {
           const otherActive = nextPlayers.filter(
             (p, i) => p.isActive && i !== playerIdx
           );
@@ -936,7 +992,7 @@ export function App() {
 
   // Draw Card(s) for any active player — Enforces Official "Draw Until Playable" & "25-Card Mercy Rule"
   const executePlayerDraw = useCallback(
-    (playerIdx: number) => {
+    (playerIdx: number, overrideAfkCount?: number) => {
       const targetPlayer = players[playerIdx];
       if (!targetPlayer || !targetPlayer.isActive) return;
 
@@ -1016,6 +1072,8 @@ export function App() {
           ...p,
           hand: sortHandCards([...p.hand, ...drawn]),
           calledUno: false,
+          afkCount:
+            overrideAfkCount !== undefined ? overrideAfkCount : p.afkCount ?? 0,
         };
       });
 
@@ -1042,6 +1100,8 @@ export function App() {
       setDrawPile(reshuffledDeck);
       setPlayers(survivorsUpdated);
       setPendingPenalty(0);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
 
       if (mercyWinner) {
         setWinner(mercyWinner);
@@ -1049,11 +1109,10 @@ export function App() {
         return;
       }
 
-      // If player took a penalty OR was knocked out OR has no playable card, advance turn.
-      // If in No Mercy mode they drew until they got a playable card (and weren't taking a penalty),
-      // let a human player play that card right away, or advance turn for AI/after penalty!
+      // If player took a penalty OR was knocked out OR timed out on AFK OR has no playable card, advance turn.
       const lastDrawnCard = drawn[drawn.length - 1];
       const canPlayLastDrawn =
+        overrideAfkCount === undefined &&
         pendingPenalty === 0 &&
         survivorsUpdated[playerIdx]?.isActive &&
         lastDrawnCard &&
@@ -1085,7 +1144,7 @@ export function App() {
 
   // Execute a 7-Swap chosen by any human seat
   const executeSevenSwapForSeat = useCallback(
-    (sourceSeatIdx: number, targetPlayerId: string) => {
+    (sourceSeatIdx: number, targetPlayerId: string, overrideAfkCount?: number) => {
       const targetIdx = players.findIndex(
         (p) => p.id === targetPlayerId && p.isActive
       );
@@ -1098,6 +1157,10 @@ export function App() {
       updated[sourceSeatIdx] = {
         ...updated[sourceSeatIdx],
         hand: sortHandCards(targetHand),
+        afkCount:
+          overrideAfkCount !== undefined
+            ? overrideAfkCount
+            : updated[sourceSeatIdx].afkCount ?? 0,
       };
       updated[targetIdx] = {
         ...updated[targetIdx],
@@ -1122,6 +1185,8 @@ export function App() {
       setDrawPile(reshuffledDeck);
       setPlayers(survivorsUpdated);
       setAwaitingSevenSwapForSeat(null);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
 
       if (mercyWinner) {
         setWinner(mercyWinner);
@@ -1245,6 +1310,25 @@ export function App() {
       setSkippedPlayerId(state.skippedPlayerId);
       setAwaitingSevenSwapForSeat(state.awaitingSevenSwapForSeat);
       setWinner(state.winner);
+      if (typeof state.turnSecondsLeft === 'number') {
+        setTurnSecondsLeft(state.turnSecondsLeft);
+      }
+
+      if (
+        state.latestElimination &&
+        state.latestElimination.id !== seenEliminationIdRef.current
+      ) {
+        seenEliminationIdRef.current = state.latestElimination.id;
+        soundFX.playSpecialEffect('elimination');
+        setActiveElimination(state.latestElimination);
+        if (elimTimerRef.current) {
+          window.clearTimeout(elimTimerRef.current);
+        }
+        const elimId = state.latestElimination.id;
+        elimTimerRef.current = window.setTimeout(() => {
+          setActiveElimination((prev) => (prev?.id === elimId ? null : prev));
+        }, 3900);
+      }
 
       if (
         state.latestFlight &&
@@ -1357,12 +1441,17 @@ export function App() {
     }
   };
 
-  // Keep latest AI execution logic in a ref so the 5-10s timer is never reset by unrelated renders
+  // Keep latest AI execution logic in a ref so the timer is never reset by unrelated renders
   const runAiTurnRef = useRef<() => void>(() => {});
   runAiTurnRef.current = () => {
     const activeSeatPlayer = players[turnIndex];
     if (!activeSeatPlayer || !activeSeatPlayer.isAI || !activeSeatPlayer.isActive) {
       return;
+    }
+
+    // Safety: if awaitingSevenSwapForSeat was ever stuck on an AI seat, clear it immediately
+    if (awaitingSevenSwapForSeat === turnIndex) {
+      setAwaitingSevenSwapForSeat(null);
     }
 
     const topCard = discardPile[discardPile.length - 1];
@@ -1399,6 +1488,171 @@ export function App() {
       executePlayerDraw(turnIndex);
     }
   };
+
+  // 1-Minute (60s) Turn Timeout & 3-Round AFK Elimination Handler
+  const handleTurnTimeoutRef = useRef<() => void>(() => {});
+  handleTurnTimeoutRef.current = () => {
+    if (showHomeScreen || mpRole === 'client' || winner || activeTotalPlayers < 2) {
+      return;
+    }
+
+    const actingIdx =
+      awaitingSevenSwapForSeat !== null ? awaitingSevenSwapForSeat : turnIndex;
+    const actingPlayer = players[actingIdx];
+    if (!actingPlayer || !actingPlayer.isActive) {
+      setTurnIndex(getNextActivePlayerIndex(turnIndex, direction, 1, players));
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
+      return;
+    }
+
+    // If an AI seat ever hit the timer, immediately force AI turn execution
+    if (actingPlayer.isAI) {
+      runAiTurnRef.current();
+      return;
+    }
+
+    const nextAfkStrikes = (actingPlayer.afkCount ?? 0) + 1;
+    setPendingWildCard(null);
+
+    // 3 ROUNDS OF INACTIVITY => ELIMINATE PLAYER FROM THE GAME!
+    if (nextAfkStrikes >= 3) {
+      const recycledPool = [...drawPile, ...actingPlayer.hand];
+      const updatedPlayers = players.map((p, idx) =>
+        idx === actingIdx
+          ? {
+              ...p,
+              isActive: false,
+              isEliminated: true,
+              afkCount: 3,
+              title: 'ELIMINATED (3 AFK)',
+              hand: [],
+              calledUno: false,
+            }
+          : p
+      );
+
+      const remainingActive = updatedPlayers.filter(
+        (p) => p.isActive && !p.isEliminated
+      );
+
+      setDrawPile(recycledPool);
+      setPlayers(updatedPlayers);
+      setAwaitingSevenSwapForSeat(null);
+      setTurnTick((t) => t + 1);
+      setTurnSecondsLeft(60);
+
+      triggerEliminationBanner({
+        playerId: actingPlayer.id,
+        playerName: actingPlayer.name,
+        avatarUrl: actingPlayer.avatarUrl,
+        reason: 'afk_3_rounds',
+        cardCount: actingPlayer.hand.length,
+        survivorsLeft: remainingActive.length,
+      });
+
+      triggerTableEffect({
+        type: 'mercy_ko',
+        color: 'red',
+        targetSeat: getRelativeSeat(actingIdx, mySeatIndex),
+        label: `⏱️ ${actingPlayer.name.toUpperCase()} ELIMINATED (3 AFK ROUNDS)!`,
+      });
+
+      if (remainingActive.length === 1) {
+        setWinner(remainingActive[0]);
+        soundFX.playSpecialEffect('win');
+      } else {
+        setTurnIndex(
+          getNextActivePlayerIndex(actingIdx, direction, 1, updatedPlayers)
+        );
+      }
+      return;
+    }
+
+    // AFK Strike 1/3 or 2/3 => Automatically throw a random playable card or draw from the deck!
+    if (awaitingSevenSwapForSeat === actingIdx) {
+      const otherOpponents = players.filter(
+        (p, idx) => p.isActive && idx !== actingIdx
+      );
+      if (otherOpponents.length > 0) {
+        const randomTarget =
+          otherOpponents[Math.floor(Math.random() * otherOpponents.length)];
+        triggerTableEffect({
+          type: 'seven_swap',
+          color: activeColor,
+          label: `⏱️ 1-MIN TIMEOUT! AUTO-SWAPPED FOR ${actingPlayer.name.toUpperCase()} (AFK ${nextAfkStrikes}/3)`,
+        });
+        executeSevenSwapForSeat(actingIdx, randomTarget.id, nextAfkStrikes);
+        return;
+      }
+    }
+
+    const topCard = discardPile[discardPile.length - 1];
+    const playableCards = actingPlayer.hand.filter((c) =>
+      canPlayCard(c, topCard, activeColor, pendingPenalty)
+    );
+
+    triggerTableEffect({
+      type: 'wild_shift',
+      color: activeColor,
+      label: `⏱️ 1-MIN TIMEOUT! AUTO-MOVE FOR ${actingPlayer.name.toUpperCase()} (AFK ${nextAfkStrikes}/3)`,
+    });
+
+    if (playableCards.length > 0) {
+      const randomCard =
+        playableCards[Math.floor(Math.random() * playableCards.length)];
+      const randomColors: ActiveColor[] = ['red', 'blue', 'green', 'yellow'];
+      const chosenColor =
+        randomCard.color === 'wild'
+          ? randomColors[Math.floor(Math.random() * randomColors.length)]
+          : undefined;
+      commitCardPlay(actingIdx, randomCard, chosenColor, nextAfkStrikes);
+    } else {
+      executePlayerDraw(actingIdx, nextAfkStrikes);
+    }
+  };
+
+  // Live 1-Minute (60-Second) Turn Countdown Interval
+  useEffect(() => {
+    if (
+      showHomeScreen ||
+      mpRole === 'client' ||
+      players.length === 0 ||
+      activeTotalPlayers < 2 ||
+      winner
+    ) {
+      return;
+    }
+
+    setTurnSecondsLeft(60);
+
+    const countdownInterval = window.setInterval(() => {
+      setTurnSecondsLeft((prev) => {
+        if (prev <= 1) {
+          window.setTimeout(() => {
+            handleTurnTimeoutRef.current();
+          }, 0);
+          return 60;
+        }
+        const nextVal = prev - 1;
+        if (nextVal <= 10) {
+          soundFX.playTimerTick(nextVal <= 5);
+        }
+        return nextVal;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+    };
+  }, [
+    showHomeScreen,
+    mpRole,
+    turnIndex,
+    turnTick,
+    activeTotalPlayers,
+    winner,
+  ]);
 
   const handleSaveMyName = useCallback(
     (newName: string) => {
@@ -1459,8 +1713,10 @@ export function App() {
   );
 
   // AI Turn Controller: bots respond at a natural human pace (1.2s - 2.2s per turn)
+  // Includes `turnTick`, `topDiscardId`, and a backup watchdog interval so AI bots NEVER stop playing!
   const activeSeatIsAI =
     Boolean(players[turnIndex]?.isAI) && Boolean(players[turnIndex]?.isActive);
+  const topDiscardId = discardPile[discardPile.length - 1]?.id ?? '';
 
   useEffect(() => {
     if (
@@ -1470,7 +1726,6 @@ export function App() {
       activeTotalPlayers < 2 ||
       !activeSeatIsAI ||
       winner ||
-      awaitingSevenSwapForSeat !== null ||
       pendingWildCard
     ) {
       return;
@@ -1482,13 +1737,21 @@ export function App() {
       runAiTurnRef.current();
     }, botThinkDelayMs);
 
+    // Backup watchdog: if for any reason the bot is still active on this turn after 2.6s, immediately execute!
+    const watchdogInterval = window.setInterval(() => {
+      runAiTurnRef.current();
+    }, 2600);
+
     return () => {
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
+      window.clearInterval(watchdogInterval);
     };
   }, [
     showHomeScreen,
     mpRole,
     turnIndex,
+    turnTick,
+    topDiscardId,
     activeSeatIsAI,
     activeTotalPlayers,
     discardPile.length,
@@ -1606,6 +1869,9 @@ export function App() {
             sevenZeroRule={sevenZeroRule}
             myPlayerName={myPlayer.name || myPlayerName}
             myAvatarUrl={myPlayer.avatarUrl || myAvatarUrl}
+            myAfkCount={myPlayer.afkCount ?? 0}
+            turnSecondsLeft={turnSecondsLeft}
+            activeElimination={activeElimination}
             activePlayer={activePlayer}
             playerCardCount={myPlayer.hand.length}
             activeBotCount={activeBotCount}
@@ -1633,6 +1899,7 @@ export function App() {
             mpStatusText={mpStatusText}
             onUpdateMyName={handleSaveMyName}
             onUpdateMyAvatar={handleSaveMyAvatar}
+            onDismissElimination={() => setActiveElimination(null)}
             onHostOnlineRoom={async (hostName) => {
               handleSaveMyName(hostName);
               const code = await mpManager.startHosting(hostName);

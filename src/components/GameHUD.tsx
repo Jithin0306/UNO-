@@ -11,8 +11,16 @@ import {
   Bot,
   Edit3,
   Camera,
+  Clock,
+  Skull,
+  AlertTriangle,
 } from 'lucide-react';
-import { ActiveColor, GameMode, Player } from '../types/uno';
+import {
+  ActiveColor,
+  EliminationEvent,
+  GameMode,
+  Player,
+} from '../types/uno';
 import {
   compressAvatarImageFile,
   DEFAULT_HUMAN_AVATAR,
@@ -23,6 +31,9 @@ interface GameHUDProps {
   sevenZeroRule: boolean;
   myPlayerName: string;
   myAvatarUrl: string;
+  myAfkCount: number;
+  turnSecondsLeft: number;
+  activeElimination: EliminationEvent | null;
   activePlayer: Player;
   playerCardCount: number;
   activeBotCount: number;
@@ -40,6 +51,7 @@ interface GameHUDProps {
   mpStatusText: string;
   onUpdateMyName: (newName: string) => void;
   onUpdateMyAvatar: (newAvatarUrl: string) => void;
+  onDismissElimination: () => void;
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
   onLeaveOnlineRoom: () => void;
@@ -58,6 +70,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   sevenZeroRule,
   myPlayerName,
   myAvatarUrl,
+  myAfkCount,
+  turnSecondsLeft,
+  activeElimination,
   activePlayer,
   playerCardCount,
   activeBotCount,
@@ -75,6 +90,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   mpStatusText,
   onUpdateMyName,
   onUpdateMyAvatar,
+  onDismissElimination,
   onHostOnlineRoom,
   onJoinOnlineRoom,
   onLeaveOnlineRoom,
@@ -269,9 +285,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 : playerCardCount}
             </span>
           </div>
+
+          {myAfkCount > 0 && (
+            <div
+              className="your-afk-warning-pill"
+              title="Missed 1-minute turns! At 3/3 AFK rounds you are eliminated from the game."
+            >
+              <AlertTriangle size={12} />
+              <span>AFK {myAfkCount} / 3</span>
+            </div>
+          )}
         </div>
 
-        {/* Center-Bottom: Integrated Turn Indicator above Player's Hand */}
+        {/* Center-Bottom: Integrated Turn Indicator + 1-Minute (60s) Auto-Move Timer */}
         <div
           className={`table-integrated-turn-banner ${
             isPlayerTurn && activeTotalPlayers >= 2
@@ -279,15 +305,55 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               : 'is-opponent-turn'
           }`}
         >
-          <span className="turn-wing left-wing" />
-          <span className="turn-indicator-label">
-            {awaitingWildColor
-              ? 'SELECT ACTIVE COLOR'
-              : awaitingSevenSwap
-              ? 'SELECT PLAYER TO SWAP HANDS'
-              : turnText}
-          </span>
-          <span className="turn-wing right-wing" />
+          <div className="turn-banner-main-row">
+            <span className="turn-wing left-wing" />
+            <span className="turn-indicator-label">
+              {awaitingWildColor
+                ? 'SELECT ACTIVE COLOR'
+                : awaitingSevenSwap
+                ? 'SELECT PLAYER TO SWAP HANDS'
+                : turnText}
+            </span>
+            {activeTotalPlayers >= 2 && !winner && (
+              <div
+                className={`turn-countdown-timer-pill ${
+                  turnSecondsLeft <= 10
+                    ? 'timer-critical'
+                    : turnSecondsLeft <= 20
+                    ? 'timer-warning'
+                    : 'timer-normal'
+                }`}
+                title="1-Minute Turn Timer: If no move is made in 60s, a random playable card is thrown or drawn automatically (3 AFK rounds = Elimination)"
+              >
+                <Clock size={12} className="timer-clock-icon" />
+                <span className="timer-digits">
+                  {Math.floor(turnSecondsLeft / 60)}:
+                  {String(turnSecondsLeft % 60).padStart(2, '0')}
+                </span>
+              </div>
+            )}
+            <span className="turn-wing right-wing" />
+          </div>
+
+          {activeTotalPlayers >= 2 && !winner && (
+            <div className="turn-timer-progress-track">
+              <div
+                className={`turn-timer-progress-fill ${
+                  turnSecondsLeft <= 10
+                    ? 'fill-critical'
+                    : turnSecondsLeft <= 20
+                    ? 'fill-warning'
+                    : 'fill-normal'
+                }`}
+                style={{
+                  width: `${Math.max(
+                    0,
+                    Math.min(100, (turnSecondsLeft / 60) * 100)
+                  )}%`,
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: UNO Button (Disabled until player can actually call UNO) & DRAW Button */}
@@ -592,6 +658,137 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 )}
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CINEMATIC FULL-STAGE ELIMINATION ANIMATION (25-CARD MERCY KO & 3-ROUND AFK TIMEOUT) */}
+      <AnimatePresence>
+        {activeElimination && (
+          <motion.div
+            key={activeElimination.id}
+            className="elimination-cinema-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onDismissElimination}
+          >
+            {/* Expanding Crimson Shockwave Rings */}
+            <motion.div
+              className="elim-shockwave-ring ring-1"
+              initial={{ scale: 0.25, opacity: 0.95 }}
+              animate={{ scale: 2.35, opacity: 0 }}
+              transition={{ duration: 1.4, ease: 'easeOut' }}
+            />
+            <motion.div
+              className="elim-shockwave-ring ring-2"
+              initial={{ scale: 0.2, opacity: 0.85 }}
+              animate={{ scale: 1.85, opacity: 0 }}
+              transition={{ duration: 1.1, delay: 0.15, ease: 'easeOut' }}
+            />
+
+            {/* Flying Shattered Cards Burst */}
+            {[
+              { x: -195, y: -115, r: -42 },
+              { x: 195, y: -110, r: 38 },
+              { x: -230, y: 35, r: -65 },
+              { x: 230, y: 40, r: 62 },
+              { x: -155, y: 140, r: -28 },
+              { x: 160, y: 135, r: 34 },
+            ].map((shard, idx) => (
+              <motion.div
+                key={idx}
+                className="elim-flying-card-shard"
+                initial={{ x: 0, y: 0, rotate: 0, scale: 0.4, opacity: 0 }}
+                animate={{
+                  x: shard.x,
+                  y: shard.y,
+                  rotate: shard.r,
+                  scale: 1,
+                  opacity: [0, 0.9, 0],
+                }}
+                transition={{ duration: 1.65, ease: 'easeOut' }}
+              >
+                <span>UNO</span>
+              </motion.div>
+            ))}
+
+            {/* Main Elimination Broadcast Plaque */}
+            <motion.div
+              className="elimination-showcase-card"
+              initial={{ scale: 0.65, y: 40, rotateX: 25 }}
+              animate={{
+                scale: [0.65, 1.06, 1],
+                y: 0,
+                rotateX: 0,
+              }}
+              exit={{ scale: 0.85, opacity: 0, y: -25 }}
+              transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="elim-card-top-laser" />
+
+              <div className="elim-header-tag">
+                <Skull size={15} className="elim-skull-pulse" />
+                <span>
+                  {activeElimination.reason === 'afk_3_rounds'
+                    ? 'INACTIVITY DISQUALIFICATION • 3 ROUNDS AFK'
+                    : 'MERCY RULE KNOCKOUT • 25+ CARDS LIMIT'}
+                </span>
+                <Skull size={15} className="elim-skull-pulse" />
+              </div>
+
+              {/* Player Portrait with Slamming X Stamp */}
+              <div className="elim-avatar-stage">
+                <motion.div
+                  className="elim-avatar-ring"
+                  animate={{
+                    x: [0, -8, 8, -6, 6, 0],
+                  }}
+                  transition={{ duration: 0.45, delay: 0.15 }}
+                >
+                  <img
+                    src={activeElimination.avatarUrl || DEFAULT_HUMAN_AVATAR}
+                    alt={activeElimination.playerName}
+                    className="elim-avatar-img"
+                  />
+                </motion.div>
+
+                <motion.div
+                  className="elim-giant-x-stamp"
+                  initial={{ scale: 2.8, opacity: 0, rotate: -20 }}
+                  animate={{ scale: 1, opacity: 1, rotate: -8 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 420,
+                    damping: 18,
+                    delay: 0.22,
+                  }}
+                >
+                  ✕
+                </motion.div>
+
+                <div className="elim-knockout-ribbon">ELIMINATED</div>
+              </div>
+
+              <h2 className="elim-player-name">
+                {activeElimination.playerName.toUpperCase()}
+              </h2>
+
+              <p className="elim-reason-description">
+                {activeElimination.reason === 'afk_3_rounds'
+                  ? `${activeElimination.playerName} did not make a move for 3 rounds (1-minute timeout per turn) and has been eliminated from the table!`
+                  : `${activeElimination.playerName} reached ${activeElimination.cardCount} cards (25-card No Mercy limit) and has been knocked out of the match!`}
+              </p>
+
+              <div className="elim-survivor-pill">
+                <span>
+                  {activeElimination.survivorsLeft === 1
+                    ? '🏆 1 CHAMPION REMAINS AT THE TABLE!'
+                    : `🔥 ${activeElimination.survivorsLeft} SURVIVORS REMAIN IN THE MATCH`}
+                </span>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

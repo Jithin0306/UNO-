@@ -27,6 +27,41 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   onAddBotToSeat,
   onRemoveBotFromSeat,
 }) => {
+  // If this player was Eliminated during the match (25-Card Mercy Rule or 3-Round AFK Timeout)
+  if (player.isEliminated) {
+    return (
+      <motion.div
+        initial={{ scale: 1.15, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className={`opponent-table-station seat-${player.seat} is-eliminated-seat`}
+      >
+        <div className="opponent-hud-pill eliminated-pill-frame">
+          <div className="opponent-avatar-frame eliminated-avatar-wrap">
+            <img
+              src={player.avatarUrl}
+              alt={player.name}
+              className="opponent-avatar-img is-grayscale"
+            />
+            <span className="eliminated-x-stamp">✕</span>
+          </div>
+
+          <div className="opponent-meta">
+            <div className="opponent-name-row">
+              <span className="opponent-username eliminated-strike">
+                {player.name}
+              </span>
+            </div>
+            <div className="opponent-status-sub">
+              <span className="status-eliminated-tag">
+                💀 {player.title || 'ELIMINATED'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
   // If this seat is currently empty (no Bot and no Online Friend)
   if (!player.isActive) {
     return (
@@ -54,6 +89,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 
   const cardCount = player.hand.length;
   const visibleFanCount = Math.min(cardCount, 10);
+  const afkStrikes = player.afkCount ?? 0;
 
   return (
     <div
@@ -89,6 +125,14 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           <div className="opponent-name-row">
             <span className="opponent-username">{player.name}</span>
             <span className="opponent-card-count">({cardCount})</span>
+            {afkStrikes > 0 && (
+              <span
+                className="opponent-afk-badge"
+                title={`Inactive for ${afkStrikes}/3 rounds (Eliminated at 3)`}
+              >
+                AFK {afkStrikes}/3
+              </span>
+            )}
           </div>
           <div className="opponent-status-sub">
             {isActiveTurn ? (

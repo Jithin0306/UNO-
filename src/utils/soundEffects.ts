@@ -82,7 +82,30 @@ class SoundEngine {
     osc.stop(now + 0.1);
   }
 
-  public playSpecialEffect(type: 'reverse' | 'penalty' | 'uno' | 'win') {
+  public playTimerTick(urgent = false) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = urgent ? 'square' : 'sine';
+    osc.frequency.setValueAtTime(urgent ? 880 : 620, now);
+    osc.frequency.exponentialRampToValueAtTime(urgent ? 440 : 480, now + 0.04);
+
+    gain.gain.setValueAtTime(urgent ? 0.035 : 0.018, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  public playSpecialEffect(
+    type: 'reverse' | 'penalty' | 'uno' | 'win' | 'elimination'
+  ) {
     if (this.muted) return;
     this.init();
     if (!this.ctx) return;
@@ -112,8 +135,29 @@ class SoundEngine {
       gain.connect(this.ctx.destination);
       osc.start(now);
       osc.stop(now + 0.31);
+    } else if (type === 'elimination') {
+      // Deep cinematic sub-bass gong + descending elimination chord
+      const notes = [220, 196, 164.81, 110];
+      notes.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const o = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        o.type = idx === 3 ? 'sawtooth' : 'triangle';
+        o.frequency.setValueAtTime(freq, now + idx * 0.11);
+        o.frequency.exponentialRampToValueAtTime(
+          freq * 0.72,
+          now + idx * 0.11 + 0.48
+        );
+        g.gain.setValueAtTime(0.11, now + idx * 0.11);
+        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.11 + 0.52);
+        o.connect(g);
+        g.connect(this.ctx.destination);
+        o.start(now + idx * 0.11);
+        o.stop(now + idx * 0.11 + 0.55);
+      });
     } else if (type === 'uno' || type === 'win') {
-      const notes = type === 'win' ? [523.25, 659.25, 783.99, 1046.5] : [587.33, 880];
+      const notes =
+        type === 'win' ? [523.25, 659.25, 783.99, 1046.5] : [587.33, 880];
       notes.forEach((freq, idx) => {
         if (!this.ctx) return;
         const o = this.ctx.createOscillator();
