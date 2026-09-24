@@ -29,6 +29,12 @@ import { PlayerHand } from './components/PlayerHand';
 import { CardFlightLayer } from './components/CardFlightLayer';
 import { GameHUD } from './components/GameHUD';
 import { HomeScreen } from './components/HomeScreen';
+import {
+  BOT_AVATAR_JAX,
+  BOT_AVATAR_KAIRO,
+  BOT_AVATAR_NYX,
+  DEFAULT_HUMAN_AVATAR,
+} from './utils/avatarImage';
 
 const INITIAL_PLAYERS_META: Array<{
   id: string;
@@ -44,38 +50,34 @@ const INITIAL_PLAYERS_META: Array<{
     name: 'Host',
     title: 'CHALLENGER',
     seat: 'bottom',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80',
+    avatarUrl: DEFAULT_HUMAN_AVATAR,
     accentColor: '#f59e0b',
     isAI: false,
   },
   {
     id: 'player-1',
     name: 'Kairo',
-    title: 'HIGH ROLLER',
+    title: 'CYBER BOT',
     seat: 'left',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
+    avatarUrl: BOT_AVATAR_KAIRO,
     accentColor: '#3b82f6',
     isAI: true,
   },
   {
     id: 'player-2',
     name: 'Nyx',
-    title: 'GRANDMASTER',
+    title: 'MECHA BOT',
     seat: 'top',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=160&auto=format&fit=crop&q=80',
+    avatarUrl: BOT_AVATAR_NYX,
     accentColor: '#a855f7',
     isAI: true,
   },
   {
     id: 'player-3',
     name: 'Jax',
-    title: 'TACTICIAN',
+    title: 'SYNTH BOT',
     seat: 'right',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&auto=format&fit=crop&q=80',
+    avatarUrl: BOT_AVATAR_JAX,
     accentColor: '#22c55e',
     isAI: true,
   },
@@ -246,6 +248,7 @@ export function App() {
       setPlayers((prevPlayers) =>
         INITIAL_PLAYERS_META.map((meta, idx) => {
           const existing = prevPlayers[idx];
+          const isSeatAI = existing ? existing.isAI : meta.isAI;
           const isActive = customActiveMask
             ? customActiveMask[idx]
             : existing
@@ -256,20 +259,20 @@ export function App() {
             name:
               idx === 0
                 ? myPlayerName
-                : existing
+                : existing && !isSeatAI
                 ? existing.name
                 : meta.name,
             avatarUrl:
               idx === 0
                 ? myAvatarUrl
-                : existing
-                ? existing.avatarUrl
-                : meta.avatarUrl,
+                : isSeatAI
+                ? meta.avatarUrl
+                : existing?.avatarUrl || meta.avatarUrl,
             title:
-              existing && !existing.isEliminated
+              existing && !existing.isEliminated && !isSeatAI
                 ? existing.title
                 : meta.title,
-            isAI: existing ? existing.isAI : meta.isAI,
+            isAI: isSeatAI,
             isActive: idx === 0 ? true : isActive,
             isEliminated: false,
             hand:
@@ -375,6 +378,7 @@ export function App() {
             ? {
                 ...p,
                 name: INITIAL_PLAYERS_META[seatIdx].name,
+                avatarUrl: INITIAL_PLAYERS_META[seatIdx].avatarUrl,
                 title: INITIAL_PLAYERS_META[seatIdx].title,
                 isAI: true,
                 isActive: true,
@@ -1454,7 +1458,7 @@ export function App() {
     [mpRole, mySeatIndex, myPlayerName]
   );
 
-  // AI Turn Controller: bots take 5 to 10 seconds (5000ms - 10000ms) per turn
+  // AI Turn Controller: bots respond at a natural human pace (1.2s - 2.2s per turn)
   const activeSeatIsAI =
     Boolean(players[turnIndex]?.isAI) && Boolean(players[turnIndex]?.isActive);
 
@@ -1472,7 +1476,7 @@ export function App() {
       return;
     }
 
-    const botThinkDelayMs = 5000 + Math.floor(Math.random() * 5001);
+    const botThinkDelayMs = 1200 + Math.floor(Math.random() * 1000);
 
     aiTimerRef.current = window.setTimeout(() => {
       runAiTurnRef.current();
