@@ -36,6 +36,7 @@
 
 - **🌐 Real-Time P2P Online Multiplayer, Live 4-Seat Lobby Roster & Instant Rematch**:
   - Powered by **PeerJS WebRTC** data channels with zero backend required.
+  - **Seamless Host Migration & AI Takeover**: If the room Host leaves (`[ EXIT ]`, `Leave Room`, or closes their browser tab) in the middle of a match, Host authority (`👑 ROOM HOST`) is **automatically transferred** to the next connected player, any other peers automatically re-link to the new Host, and the departed player's seat seamlessly continues playing as an AI Bot holding their exact hand so the game **never stops**.
   - **Live `PLAYERS IN LOBBY` Roster**: Host a private room (`#XXXXX`) and watch friends join in real time across all **4 Table Seats (`Seat 1` – `Seat 4`)** with their uploaded Profile Pictures, Display Names, `👑 HOST` / `● JOINED` status badges, and optional `+ BOT` / `✕` seat toggles before launching the table.
   - **Synchronized Table Entry**: Clicking **`ENTER GAME TABLE`** deals fresh hands and automatically brings all connected lobby friends into the 3D game table simultaneously.
   - **In-Room `REMATCH / PLAY AGAIN` & Dismiss Controls**: After winning or losing a match, **any player or the room Host** can click **`REMATCH / PLAY AGAIN`** to immediately deal a fresh match in the same room (reviving any eliminated players), or click **`DISMISS`** (`✕`) to inspect the final table state without leaving the room.

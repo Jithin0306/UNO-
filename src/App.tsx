@@ -354,6 +354,7 @@ export function App() {
         mode,
         sevenZeroRule,
         players,
+        drawPile,
         drawPileCount: drawPile.length,
         discardPile,
         activeColor,
@@ -365,6 +366,7 @@ export function App() {
         winner,
         turnSecondsLeft,
         inLobby: showHomeScreen,
+        hostSeatIndex: mySeatIndex,
         latestFlight: latestFlightRef.current,
         latestEffect: latestEffectRef.current,
         latestElimination: latestEliminationRef.current,
@@ -373,6 +375,7 @@ export function App() {
     }
   }, [
     mpRole,
+    mySeatIndex,
     showHomeScreen,
     mode,
     sevenZeroRule,
@@ -1237,22 +1240,138 @@ export function App() {
     mpManager.onClientLeft = (seatIdx) => {
       setConnectedFriendsCount(mpManager.getConnectedPeerCount());
       setPlayers((prev) => {
-        const updated = prev.map((p, idx) =>
-          idx === seatIdx
-            ? {
-                ...p,
-                name: INITIAL_PLAYERS_META[seatIdx].name,
-                avatarUrl: INITIAL_PLAYERS_META[seatIdx].avatarUrl,
-                title: INITIAL_PLAYERS_META[seatIdx].title,
-                isAI: true,
-                isActive: false, // Leave seat empty when friend disconnects unless a bot is manually added
-              }
-            : p
-        );
-        if (turnIndex === seatIdx) {
-          setTurnIndex(getNextActivePlayerIndex(seatIdx, direction, 1, updated));
-        }
+        const updated = prev.map((p, idx) => {
+          if (idx !== seatIdx) return p;
+          const keepPlayingAsBot = !showHomeScreen && p.isActive && !p.isEliminated;
+          const cleanBaseName = p.name.replace(/ \(Bot\)$/i, '');
+          return {
+            ...p,
+            name: keepPlayingAsBot
+              ? `${cleanBaseName} (Bot)`
+              : INITIAL_PLAYERS_META[seatIdx].name,
+            avatarUrl: INITIAL_PLAYERS_META[seatIdx].avatarUrl,
+            title: keepPlayingAsBot
+              ? 'AI TAKEOVER'
+              : INITIAL_PLAYERS_META[seatIdx].title,
+            isAI: true,
+            isActive: keepPlayingAsBot,
+          };
+        });
         return updated;
+      });
+      if (awaitingSevenSwapForSeat === seatIdx) {
+        setAwaitingSevenSwapForSeat(null);
+      }
+      setTurnTick((t) => t + 1);
+    };
+
+    mpManager.onPromotedToHost = (
+      newHostSeatIdx,
+      formerHostSeatIdx,
+      migratedState
+    ) => {
+      setMpRole('host');
+      setMySeatIndex(newHostSeatIdx);
+      setConnectedFriendsCount(mpManager.getConnectedPeerCount());
+      if (migratedState.drawPile && migratedState.drawPile.length > 0) {
+        setDrawPile(migratedState.drawPile);
+      }
+      setDiscardPile(migratedState.discardPile);
+      setActiveColor(migratedState.activeColor);
+      setTurnIndex(migratedState.turnIndex);
+      setDirection(migratedState.direction);
+      setPendingPenalty(migratedState.pendingPenalty);
+      setSkippedPlayerId(migratedState.skippedPlayerId);
+      setAwaitingSevenSwapForSeat(
+        migratedState.awaitingSevenSwapForSeat === formerHostSeatIdx
+          ? null
+          : migratedState.awaitingSevenSwapForSeat
+      );
+      setWinner(migratedState.winner);
+
+      const wasInLobby = Boolean(migratedState.inLobby);
+      setPlayers(
+        migratedState.players.map((p, idx) => {
+          if (idx === newHostSeatIdx) {
+            return {
+              ...p,
+              title: 'ROOM HOST',
+              isAI: false,
+              isActive: true,
+              hand: sortHandCards(p.hand),
+            };
+          }
+          if (idx === formerHostSeatIdx) {
+            const keepPlayingAsBot = !wasInLobby && p.isActive && !p.isEliminated;
+            const cleanBaseName = p.name.replace(/ \(Bot\)$/i, '');
+            return {
+              ...p,
+              name: keepPlayingAsBot
+                ? `${cleanBaseName} (Bot)`
+                : INITIAL_PLAYERS_META[idx].name,
+              avatarUrl: INITIAL_PLAYERS_META[idx].avatarUrl,
+              title: keepPlayingAsBot
+                ? 'AI TAKEOVER'
+                : INITIAL_PLAYERS_META[idx].title,
+              isAI: true,
+              isActive: keepPlayingAsBot,
+              hand: sortHandCards(p.hand),
+            };
+          }
+          return {
+            ...p,
+            hand: sortHandCards(p.hand),
+          };
+        })
+      );
+
+      setTurnTick((t) => t + 1);
+      const promotedName =
+        migratedState.players[newHostSeatIdx]?.name || 'YOU';
+      triggerTableEffect({
+        type: 'wild_shift',
+        color: migratedState.activeColor,
+        label: `👑 HOST TRANSFERRED TO ${promotedName.toUpperCase()}!`,
+      });
+    };
+
+    mpManager.onHostMigratedToOther = (
+      newHostSeatIdx,
+      formerHostSeatIdx,
+      migratedState
+    ) => {
+      const wasInLobby = Boolean(migratedState.inLobby);
+      setPlayers((prev) =>
+        prev.map((p, idx) => {
+          if (idx === newHostSeatIdx) {
+            return { ...p, title: 'ROOM HOST' };
+          }
+          if (idx === formerHostSeatIdx) {
+            const keepPlayingAsBot = !wasInLobby && p.isActive && !p.isEliminated;
+            const cleanBaseName = p.name.replace(/ \(Bot\)$/i, '');
+            return {
+              ...p,
+              name: keepPlayingAsBot
+                ? `${cleanBaseName} (Bot)`
+                : INITIAL_PLAYERS_META[idx].name,
+              avatarUrl: INITIAL_PLAYERS_META[idx].avatarUrl,
+              title: keepPlayingAsBot
+                ? 'AI TAKEOVER'
+                : INITIAL_PLAYERS_META[idx].title,
+              isAI: true,
+              isActive: keepPlayingAsBot,
+            };
+          }
+          return p;
+        })
+      );
+
+      const newHostName =
+        migratedState.players[newHostSeatIdx]?.name || `Seat ${newHostSeatIdx + 1}`;
+      triggerTableEffect({
+        type: 'wild_shift',
+        color: migratedState.activeColor,
+        label: `👑 HOST TRANSFERRED TO ${newHostName.toUpperCase()}!`,
       });
     };
 
@@ -1301,6 +1420,9 @@ export function App() {
       setMySeatIndex(assignedSeat);
       setMode(state.mode);
       setSevenZeroRule(state.sevenZeroRule);
+      if (state.drawPile && state.drawPile.length > 0) {
+        setDrawPile(state.drawPile);
+      }
       setPlayers(
         state.players.map((p) => ({
           ...p,
@@ -1940,7 +2062,7 @@ export function App() {
               setRoomCode(codeToJoin.toUpperCase());
             }}
             onLeaveOnlineRoom={() => {
-              mpManager.disconnect();
+              mpManager.leaveWithHostMigration();
               setMpRole('offline');
               setRoomCode('');
               setMySeatIndex(0);
@@ -2004,6 +2126,14 @@ export function App() {
               }
             }}
             onNewMatch={() => {
+              if (mpRole !== 'offline') {
+                mpManager.leaveWithHostMigration();
+                setMpRole('offline');
+                setRoomCode('');
+                setMySeatIndex(0);
+                setConnectedFriendsCount(0);
+                startNewMatch(mode, [true, false, true, false]);
+              }
               setShowHomeScreen(true);
             }}
           />

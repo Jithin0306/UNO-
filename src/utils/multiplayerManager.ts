@@ -1,7 +1,6 @@
 import Peer, { DataConnection } from 'peerjs';
 import {
   ActiveColor,
-  CardFlight,
   EliminationEvent,
   GameMode,
   Player,
@@ -22,6 +21,7 @@ export interface SyncedTableState {
   mode: GameMode;
   sevenZeroRule: boolean;
   players: Player[];
+  drawPile?: UnoCardData[];
   drawPileCount: number;
   discardPile: UnoCardData[];
   activeColor: ActiveColor;
@@ -33,6 +33,7 @@ export interface SyncedTableState {
   winner: Player | null;
   turnSecondsLeft?: number;
   inLobby?: boolean;
+  hostSeatIndex?: number;
   latestFlight?: NetworkFlightEvent | null;
   latestEffect?: TableSpecialEffect | null;
   latestElimination?: EliminationEvent | null;
@@ -43,6 +44,7 @@ export type ClientActionMessage =
       type: 'JOIN_HELLO';
       playerName: string;
       avatarUrl?: string;
+      preferredSeatIndex?: number;
     }
   | {
       type: 'PLAY_CARD';
@@ -74,20 +76,33 @@ export type ClientActionMessage =
       seatIndex: number;
     };
 
-export interface HostBroadcastMessage {
-  type: 'STATE_SYNC';
-  assignedSeatIndex: number;
-  roomCode: string;
-  state: SyncedTableState;
-}
+export type HostBroadcastMessage =
+  | {
+      type: 'STATE_SYNC';
+      assignedSeatIndex: number;
+      roomCode: string;
+      state: SyncedTableState;
+    }
+  | {
+      type: 'HOST_MIGRATE';
+      newHostSeatIndex: number;
+      formerHostSeatIndex: number;
+      roomCode: string;
+      state: SyncedTableState;
+    };
 
 const PEER_PREFIX = 'uno-billiards-royale-';
 
 export class MultiplayerRoomManager {
   private peer: Peer | null = null;
+  private secondaryPeer: Peer | null = null;
   private connections: Map<number, DataConnection> = new Map();
   private hostConn: DataConnection | null = null;
   private lastBroadcastState: SyncedTableState | null = null;
+  private lastReceivedState: SyncedTableState | null = null;
+  private isMigrating: boolean = false;
+  private localPlayerName: string = 'Player';
+  private localAvatarUrl?: string;
 
   public role: 'offline' | 'host' | 'client' = 'offline';
   public roomCode: string = '';
@@ -106,6 +121,31 @@ export class MultiplayerRoomManager {
   ) => void;
   public onStatusChange?: (statusText: string) => void;
 
+  // Triggered when the Host leaves and THIS player is automatically promoted to the new Host
+  public onPromotedToHost?: (
+    newHostSeatIndex: number,
+    formerHostSeatIndex: number,
+    migratedState: SyncedTableState
+  ) => void;
+
+  // Triggered when the Host leaves and ANOTHER connected player becomes the new Host
+  public onHostMigratedToOther?: (
+    newHostSeatIndex: number,
+    formerHostSeatIndex: number,
+    migratedState: SyncedTableState
+  ) => void;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      // Automatically migrate Host if the Host closes or refreshes their browser tab mid-game
+      window.addEventListener('beforeunload', () => {
+        if (this.role === 'host' && this.connections.size > 0 && this.lastBroadcastState) {
+          this.leaveWithHostMigration(this.lastBroadcastState);
+        }
+      });
+    }
+  }
+
   public generateCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let out = '';
@@ -115,11 +155,86 @@ export class MultiplayerRoomManager {
     return out;
   }
 
+  private attachHostConnectionHandler(targetPeer: Peer) {
+    targetPeer.on('connection', (conn) => {
+      let assignedSeat = -1;
+
+      conn.on('data', (raw) => {
+        const msg = raw as ClientActionMessage;
+        if (msg.type === 'JOIN_HELLO') {
+          // If this is a migrating client with a preferredSeatIndex, preserve their exact seat!
+          if (
+            typeof msg.preferredSeatIndex === 'number' &&
+            msg.preferredSeatIndex >= 0 &&
+            msg.preferredSeatIndex < 4 &&
+            msg.preferredSeatIndex !== this.mySeatIndex
+          ) {
+            assignedSeat = msg.preferredSeatIndex;
+          } else if (assignedSeat === -1) {
+            for (const candidate of [0, 1, 2, 3]) {
+              if (
+                candidate !== this.mySeatIndex &&
+                !this.connections.has(candidate)
+              ) {
+                assignedSeat = candidate;
+                break;
+              }
+            }
+          }
+
+          if (assignedSeat === -1) {
+            conn.close();
+            return;
+          }
+
+          this.connections.set(assignedSeat, conn);
+
+          this.onClientJoined?.(
+            assignedSeat,
+            msg.playerName || `Player ${assignedSeat + 1}`,
+            msg.avatarUrl
+          );
+
+          if (this.lastBroadcastState) {
+            conn.send({
+              type: 'STATE_SYNC',
+              assignedSeatIndex: assignedSeat,
+              roomCode: this.roomCode,
+              state: this.lastBroadcastState,
+            } satisfies HostBroadcastMessage);
+          }
+        } else {
+          // Determine seat from active connection map if needed
+          let verifiedSeat = assignedSeat;
+          if (verifiedSeat === -1) {
+            this.connections.forEach((c, idx) => {
+              if (c === conn) verifiedSeat = idx;
+            });
+          }
+          if (verifiedSeat !== -1) {
+            this.onClientAction?.({
+              ...msg,
+              seatIndex: verifiedSeat,
+            } as ClientActionMessage);
+          }
+        }
+      });
+
+      conn.on('close', () => {
+        if (assignedSeat !== -1 && this.connections.get(assignedSeat) === conn) {
+          this.connections.delete(assignedSeat);
+          this.onClientLeft?.(assignedSeat);
+        }
+      });
+    });
+  }
+
   public startHosting(
     hostName: string,
     customCode?: string
   ): Promise<string> {
     this.disconnect();
+    this.localPlayerName = hostName;
     const code = (customCode || this.generateCode()).toUpperCase();
     this.roomCode = code;
     this.role = 'host';
@@ -134,57 +249,7 @@ export class MultiplayerRoomManager {
         resolve(code);
       });
 
-      peer.on('connection', (conn) => {
-        // Assign an available seat (1, 2, or 3) immediately upon connection
-        let assignedSeat = -1;
-        for (const candidate of [1, 2, 3]) {
-          if (!this.connections.has(candidate)) {
-            assignedSeat = candidate;
-            break;
-          }
-        }
-
-        if (assignedSeat === -1) {
-          conn.close();
-          return;
-        }
-
-        this.connections.set(assignedSeat, conn);
-
-        conn.on('open', () => {
-          // Immediately send the current state with their assigned seat index (1, 2, or 3)
-          if (this.lastBroadcastState) {
-            conn.send({
-              type: 'STATE_SYNC',
-              assignedSeatIndex: assignedSeat,
-              roomCode: this.roomCode,
-              state: this.lastBroadcastState,
-            } satisfies HostBroadcastMessage);
-          }
-        });
-
-        conn.on('data', (raw) => {
-          const msg = raw as ClientActionMessage;
-          if (msg.type === 'JOIN_HELLO') {
-            this.onClientJoined?.(
-              assignedSeat,
-              msg.playerName || `Player ${assignedSeat + 1}`,
-              msg.avatarUrl
-            );
-          } else {
-            // Ensure action always uses the verified assignedSeat for this connection
-            this.onClientAction?.({
-              ...msg,
-              seatIndex: assignedSeat,
-            } as ClientActionMessage);
-          }
-        });
-
-        conn.on('close', () => {
-          this.connections.delete(assignedSeat);
-          this.onClientLeft?.(assignedSeat);
-        });
-      });
+      this.attachHostConnectionHandler(peer);
 
       peer.on('error', (err) => {
         this.onStatusChange?.(`Network Error: ${err.type}`);
@@ -199,9 +264,12 @@ export class MultiplayerRoomManager {
     avatarUrl?: string
   ): Promise<void> {
     this.disconnect();
+    this.localPlayerName = playerName.trim() || 'Friend';
+    this.localAvatarUrl = avatarUrl;
     const cleanCode = roomCode.trim().toUpperCase().replace(/^#/, '');
     this.roomCode = cleanCode;
     this.role = 'client';
+    this.isMigrating = false;
 
     return new Promise((resolve, reject) => {
       const peer = new Peer();
@@ -217,24 +285,13 @@ export class MultiplayerRoomManager {
           this.onStatusChange?.(`CONNECTED TO #${cleanCode}`);
           conn.send({
             type: 'JOIN_HELLO',
-            playerName: playerName.trim() || 'Friend',
-            avatarUrl,
+            playerName: this.localPlayerName,
+            avatarUrl: this.localAvatarUrl,
           } satisfies ClientActionMessage);
           resolve();
         });
 
-        conn.on('data', (raw) => {
-          const msg = raw as HostBroadcastMessage;
-          if (msg && msg.type === 'STATE_SYNC') {
-            this.mySeatIndex = msg.assignedSeatIndex;
-            this.onStateReceived?.(msg.state, msg.assignedSeatIndex);
-          }
-        });
-
-        conn.on('close', () => {
-          this.onStatusChange?.('HOST DISCONNECTED');
-          this.role = 'offline';
-        });
+        this.bindClientConnectionEvents(conn);
 
         conn.on('error', (e) => {
           reject(e);
@@ -246,6 +303,229 @@ export class MultiplayerRoomManager {
         reject(err);
       });
     });
+  }
+
+  private bindClientConnectionEvents(conn: DataConnection) {
+    conn.on('data', (raw) => {
+      const msg = raw as HostBroadcastMessage;
+      if (!msg) return;
+
+      if (msg.type === 'STATE_SYNC') {
+        this.mySeatIndex = msg.assignedSeatIndex;
+        this.lastReceivedState = msg.state;
+        this.onStateReceived?.(msg.state, msg.assignedSeatIndex);
+      } else if (msg.type === 'HOST_MIGRATE') {
+        this.lastReceivedState = msg.state;
+        this.handleHostDeparture(
+          msg.formerHostSeatIndex,
+          msg.newHostSeatIndex,
+          msg.state
+        );
+      }
+    });
+
+    conn.on('close', () => {
+      // If the Host disconnected unexpectedly without sending HOST_MIGRATE, automatically elect the next human player as Host!
+      if (this.role === 'client' && !this.isMigrating && this.lastReceivedState) {
+        const formerHostIdx =
+          typeof this.lastReceivedState.hostSeatIndex === 'number'
+            ? this.lastReceivedState.hostSeatIndex
+            : 0;
+        const electedSeat = this.electNextHostSeat(
+          this.lastReceivedState,
+          formerHostIdx
+        );
+        this.handleHostDeparture(
+          formerHostIdx,
+          electedSeat,
+          this.lastReceivedState
+        );
+      }
+    });
+  }
+
+  private electNextHostSeat(
+    state: SyncedTableState,
+    formerHostSeatIndex: number
+  ): number {
+    // Deterministically pick the lowest seat index occupied by an active human player (excluding formerHostSeatIndex)
+    for (let idx = 0; idx < state.players.length; idx++) {
+      if (idx === formerHostSeatIndex) continue;
+      const p = state.players[idx];
+      if (p && p.isActive && !p.isAI) {
+        return idx;
+      }
+    }
+    return this.mySeatIndex;
+  }
+
+  private handleHostDeparture(
+    formerHostSeatIndex: number,
+    newHostSeatIndex: number,
+    snapshotState: SyncedTableState
+  ) {
+    if (this.isMigrating) return;
+    this.isMigrating = true;
+
+    if (this.hostConn) {
+      try {
+        this.hostConn.close();
+      } catch {}
+      this.hostConn = null;
+    }
+
+    if (this.mySeatIndex === newHostSeatIndex) {
+      // THIS PLAYER BECOMES THE NEW ROOM HOST!
+      this.promoteSelfToHost(
+        this.roomCode,
+        newHostSeatIndex,
+        formerHostSeatIndex,
+        snapshotState
+      );
+    } else {
+      // ANOTHER PLAYER BECAME THE NEW HOST — RECONNECT TO THEM AUTOMATICALLY!
+      this.reconnectToNewHost(
+        this.roomCode,
+        newHostSeatIndex,
+        formerHostSeatIndex,
+        snapshotState
+      );
+    }
+  }
+
+  private promoteSelfToHost(
+    code: string,
+    myHostSeatIdx: number,
+    formerHostSeatIdx: number,
+    snapshotState: SyncedTableState
+  ) {
+    if (this.peer) {
+      try {
+        this.peer.destroy();
+      } catch {}
+      this.peer = null;
+    }
+    this.connections.clear();
+    this.role = 'host';
+    this.mySeatIndex = myHostSeatIdx;
+
+    // Open guaranteed migration Peer ID (`...-H{seatIdx}`) immediately so remaining peers reconnect in <400ms
+    const migrationPeerId = `${PEER_PREFIX}${code}-H${myHostSeatIdx}`;
+    const hostPeer = new Peer(migrationPeerId);
+    this.peer = hostPeer;
+
+    hostPeer.on('open', () => {
+      this.onStatusChange?.(`HOSTING ROOM #${code} (MIGRATED)`);
+    });
+    this.attachHostConnectionHandler(hostPeer);
+
+    // Also claim the primary room code Peer ID (`uno-billiards-royale-XXXXX`) so any new friends can still join via #code
+    window.setTimeout(() => {
+      if (this.role !== 'host') return;
+      try {
+        const primaryPeer = new Peer(`${PEER_PREFIX}${code}`);
+        this.secondaryPeer = primaryPeer;
+        this.attachHostConnectionHandler(primaryPeer);
+        primaryPeer.on('error', () => {
+          // Ignore if old broker socket hasn't timed out yet
+        });
+      } catch {}
+    }, 600);
+
+    this.isMigrating = false;
+    this.onPromotedToHost?.(myHostSeatIdx, formerHostSeatIdx, snapshotState);
+  }
+
+  private reconnectToNewHost(
+    code: string,
+    newHostSeatIdx: number,
+    formerHostSeatIdx: number,
+    snapshotState: SyncedTableState
+  ) {
+    this.onHostMigratedToOther?.(
+      newHostSeatIdx,
+      formerHostSeatIdx,
+      snapshotState
+    );
+    this.onStatusChange?.(`TRANSFERRING HOST TO SEAT ${newHostSeatIdx + 1}...`);
+
+    const targetPeerId = `${PEER_PREFIX}${code}-H${newHostSeatIdx}`;
+    let attempts = 0;
+
+    const tryConnect = () => {
+      attempts++;
+      if (!this.peer || this.peer.destroyed) {
+        this.peer = new Peer();
+      }
+
+      const connectNow = () => {
+        if (!this.peer) return;
+        const conn = this.peer.connect(targetPeerId, { reliable: true });
+        this.hostConn = conn;
+
+        conn.on('open', () => {
+          this.isMigrating = false;
+          this.onStatusChange?.(`CONNECTED TO #${code}`);
+          conn.send({
+            type: 'JOIN_HELLO',
+            playerName: this.localPlayerName,
+            avatarUrl: this.localAvatarUrl,
+            preferredSeatIndex: this.mySeatIndex,
+          } satisfies ClientActionMessage);
+        });
+
+        this.bindClientConnectionEvents(conn);
+
+        conn.on('error', () => {
+          if (attempts < 5) {
+            window.setTimeout(tryConnect, 500);
+          }
+        });
+      };
+
+      if (this.peer.open) {
+        connectNow();
+      } else {
+        this.peer.once('open', connectNow);
+      }
+    };
+
+    window.setTimeout(tryConnect, 350);
+  }
+
+  /**
+   * Called when the current Host leaves the game (e.g. clicks [ EXIT ] or Leave Room).
+   * Broadcasts HOST_MIGRATE to all connected players so the next player immediately becomes Host
+   * and the match continues without stopping!
+   */
+  public leaveWithHostMigration(currentState?: SyncedTableState) {
+    const stateToMigrate = currentState || this.lastBroadcastState;
+    if (
+      this.role === 'host' &&
+      this.connections.size > 0 &&
+      stateToMigrate
+    ) {
+      const connectedSeats = Array.from(this.connections.keys()).sort(
+        (a, b) => a - b
+      );
+      const newHostSeatIndex = connectedSeats[0];
+
+      this.connections.forEach((conn) => {
+        if (conn.open) {
+          try {
+            conn.send({
+              type: 'HOST_MIGRATE',
+              newHostSeatIndex,
+              formerHostSeatIndex: this.mySeatIndex,
+              roomCode: this.roomCode,
+              state: stateToMigrate,
+            } satisfies HostBroadcastMessage);
+          } catch {}
+        }
+      });
+    }
+
+    this.disconnect();
   }
 
   public broadcastState(state: SyncedTableState) {
@@ -284,9 +564,14 @@ export class MultiplayerRoomManager {
       this.peer.destroy();
       this.peer = null;
     }
+    if (this.secondaryPeer) {
+      this.secondaryPeer.destroy();
+      this.secondaryPeer = null;
+    }
     this.role = 'offline';
     this.roomCode = '';
     this.mySeatIndex = 0;
+    this.isMigrating = false;
   }
 }
 
