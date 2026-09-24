@@ -25,29 +25,49 @@
   - **7 Swap & 0 Pass**: Playing a **7** forces a hand swap with an active player of your choice; playing a **0** rotates everyone's hands in the current direction of play.
   - **Special Action & Wild Cards**: Includes **Skip Everyone** (play again immediately), **Discard All** (drop all cards of that color from your hand), **Wild Reverse Draw 4**, **Wild Draw 6**, **Wild Draw 10**, and **Wild Color Roulette**.
 
-- **🌐 Real-Time P2P Online Multiplayer (Zero Backend Required)**:
-  - Powered by **PeerJS WebRTC** data channels.
-  - Host a private table with a 5-character room code (e.g., `#LUA2H`) and share a one-click invite link (`?room=XXXXX`) with up to 3 friends.
-  - Automatic perspective rotation so every connected player sits at the foreground (`bottom`) of their own screen.
+- **⏱️ 1-Minute (`01:00`) Turn Countdown Timer, Auto-Move & 3-Round AFK Elimination**:
+  - **60-Second Turn Timer**: Every turn features a live `01:00` countdown clock and color-shifting progress bar (emerald → amber → pulsing crimson with countdown ticks in the final 10 seconds), synchronized across all multiplayer peers.
+  - **Automatic Card Play / Draw**: If a player does not make a move within 1 minute (`00:00`), a random playable card is automatically thrown from their hand (or drawn from the deck if no card is playable) and an AFK strike (`AFK 1/3`, `AFK 2/3`) is recorded.
+  - **3-Round Inactivity Elimination**: If a player fails to act for **3 rounds** (`AFK 3/3`), they are immediately eliminated from the match (`ELIMINATED (3 AFK)`).
+
+- **💀 Full-Stage Cinematic Elimination Animation (Synced Across All Players)**:
+  - Whenever any player is knocked out—either via the **25-Card Mercy Rule** or **3-Round AFK Disqualification**—every player at the table simultaneously sees a full-screen **Cinematic Elimination Showcase** featuring crimson shockwave rings, flying card shards, the eliminated player's portrait with an animated `✕` knockout stamp, survivor count pill, and sub-bass elimination gong.
+  - Eliminated seats convert into crossed-out **Tombstone Badges (`💀 ELIMINATED`)** on the table.
+
+- **🌐 Real-Time P2P Online Multiplayer, Live 4-Seat Lobby Roster & Instant Rematch**:
+  - Powered by **PeerJS WebRTC** data channels with zero backend required.
+  - **Live `PLAYERS IN LOBBY` Roster**: Host a private room (`#XXXXX`) and watch friends join in real time across all **4 Table Seats (`Seat 1` – `Seat 4`)** with their uploaded Profile Pictures, Display Names, `👑 HOST` / `● JOINED` status badges, and optional `+ BOT` / `✕` seat toggles before launching the table.
+  - **Synchronized Table Entry**: Clicking **`ENTER GAME TABLE`** deals fresh hands and automatically brings all connected lobby friends into the 3D game table simultaneously.
+  - **In-Room `REMATCH / PLAY AGAIN` & Dismiss Controls**: After winning or losing a match, **any player or the room Host** can click **`REMATCH / PLAY AGAIN`** to immediately deal a fresh match in the same room (reviving any eliminated players), or click **`DISMISS`** (`✕`) to inspect the final table state without leaving the room.
+
+- **🎵 100% Copyright-Free Looping Background Music & Live Volume Capsule**:
+  - Built-in polyphonic Web Audio API background music sequencer playing **100% copyright-free loops** with studio lowpass warmth and stereo delay.
+  - Switch anytime between **3 original loops**:
+    1. **Emerald Lounge (`92 BPM`)** — Smooth jazz-lounge Rhodes chords & walking sub-bass
+    2. **No Mercy Pulse (`108 BPM`)** — Dark synthwave arena groove & arpeggio
+    3. **Midnight Lo-Fi (`82 BPM`)** — Mellow lo-fi chillhop keys & beat
+  - Interactive **Music Controls Capsule** on both the Home Screen and In-Game HUD with **Mute/Unmute**, **Volume `−` / `+` buttons**, **0%–100% Volume Slider**, and **Track Switcher** (independent from card SFX mute).
 
 - **📸 Custom Profile Picture & Identity Sync**:
   - Upload your own **Profile Picture** directly from your device's local file gallery (`JPG`, `PNG`, `WEBP`).
-  - Automatic `160×160` center-crop & compression persists your avatar in `localStorage` and broadcasts it in real time to all connected friends at the table.
+  - Automatic `160×160` center-crop & compression persists your avatar in `localStorage` and broadcasts it in real time to all connected friends in the lobby and at the table.
 
-- **🤖 Smart Cyber-Bots & Flexible Match Presets**:
-  - Choose **1 vs 1 Duel**, **1 vs 3 Full Table**, or **Empty Table** (`0 Bots`) to add/remove bots manually before starting.
-  - Custom **3D Cyber-Robot Profile Avatars** (*Kairo*, *Nyx*, and *Jax*) with natural human-paced reaction timing (`1.2s – 2.2s`).
+- **🤖 Smart Cyber-Bots & Watchdog Turn Engine**:
+  - Choose **1 vs 1 Duel**, **1 vs 3 Full Table**, or **Empty Table** (`0 Bots`).
+  - Custom **3D Cyber-Robot Profile Avatars** (*Kairo*, *Nyx*, and *Jax*) with natural human-paced reaction timing (`1.2s – 2.2s`) and a continuous watchdog turn engine so bots never stall on consecutive/extra turns.
 
 - **📱 Desktop & Mobile Optimized (Portrait + Landscape)**:
   - Automatic color-grouped player hand (`Red` → `Blue` → `Green` → `Yellow` → `Wild`) with dynamic viewport scaling so 100% of your cards stay visible at `100%` browser zoom and on mobile screens.
 
 ---
 
-## 🕹️ Official *Show 'Em No Mercy* Rules Implemented
+## 🕹️ Official *Show 'Em No Mercy* & Table Rules Implemented
 
-| Rule / Card | Effect in Game |
+| Rule / Feature | Effect in Game |
 | :--- | :--- |
-| **Mercy Rule (25 Cards)** | Hold **25 or more cards** at any point and you are **immediately eliminated** (`ELIMINATED`). |
+| **Mercy Rule (25 Cards)** | Hold **25 or more cards** at any point and you are **immediately eliminated** (`ELIMINATED`) with a full-stage knockout animation. |
+| **1-Minute Turn Timer & Auto-Move** | Each turn has a **60-second (`01:00`)** timer; if it expires, a random playable card is automatically played (or drawn). |
+| **3-Round AFK Elimination** | Timing out for **3 turns (`AFK 3/3`)** immediately eliminates the inactive player from the match. |
 | **Stacking (`+2`, `+4`, `+6`, `+10`)** | Deflect an incoming penalty by playing any Draw card with a value **$\ge$** the last played Draw card. |
 | **7 — Hand Swap** | When any `7` is played, you **must** choose another active player and swap your entire hand with theirs. |
 | **0 — Pass All Hands** | When any `0` is played, all active players pass their entire hand to the next player in the direction of play. |
@@ -98,23 +118,24 @@ src/
 ├── components/
 │   ├── CardFlightLayer.tsx    # Bezier card flight trajectories & table shockwaves
 │   ├── CenterTableArea.tsx    # 3D Draw Pile, Discard Pile & Pulsing Active Color Ring
-│   ├── GameHUD.tsx            # In-game HUD, UNO button lock, Wild picker & Online Lounge modal
-│   ├── HomeScreen.tsx         # 2-Column No Mercy Launch Console & Local Gallery Avatar Uploader
-│   ├── OpponentSeat.tsx       # Top/Left/Right opponent stations, Robot avatars & card fans
+│   ├── GameHUD.tsx            # In-game HUD, 60s Turn Timer, Elimination Cinema, Rematch & Dismiss Modal
+│   ├── HomeScreen.tsx         # 2-Column No Mercy Console, Gallery Avatar Uploader & 4-Seat Live Lobby Roster
+│   ├── MusicControls.tsx      # Looping Background Music Mute, Volume (- / Slider / +) & Track Switcher
+│   ├── OpponentSeat.tsx       # Top/Left/Right seats, Robot avatars, AFK badges & Eliminated Tombstones
 │   ├── PlayerHand.tsx         # Auto-sorted color clusters & responsive 100%-zoom/mobile hand math
 │   ├── PoolTableStage.tsx     # 3D emerald billiards table cabinet, brass pockets & overhead lighting
 │   └── UnoCard.tsx            # High-contrast physical UNO & No Mercy card renderer
 ├── styles/
-│   └── billiards.css          # 3D table shaders, animations, Home Screen & mobile media queries
+│   └── billiards.css          # 3D table shaders, Elimination Cinema, Lobby Roster, Timer & mobile styles
 ├── types/
-│   └── uno.ts                 # Core TypeScript interfaces for cards, seats, modes & network sync
+│   └── uno.ts                 # Core TypeScript interfaces for cards, seats, eliminations & network sync
 ├── utils/
 │   ├── avatarImage.ts         # Local gallery image cropper/compressor & Cyber-Robot SVG generator
 │   ├── deckBuilder.ts         # Official 168-card No Mercy & Classic deck generator + play validation
 │   ├── handSorting.ts         # Strict color-group & rank hand organizer
-│   ├── multiplayerManager.ts  # PeerJS WebRTC Host/Client state synchronization
-│   └── soundEffects.ts        # Web Audio API procedural card snaps, riffles & victory fanfare
-└── App.tsx                    # Authoritative game loop, Mercy Rule engine, AI controller & P2P hooks
+│   ├── multiplayerManager.ts  # PeerJS WebRTC Host/Client state, Lobby sync & Rematch messaging
+│   └── soundEffects.ts        # Copyright-free looping BGM synthesizer + card/timer/elimination SFX
+└── App.tsx                    # Authoritative game loop, 60s Timer/AFK engine, AI watchdog & P2P hooks
 ```
 
 ---
