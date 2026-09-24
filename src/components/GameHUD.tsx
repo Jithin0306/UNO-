@@ -337,14 +337,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
               <div className="lounge-input-group">
                 <label>YOUR DISPLAY NAME (SHOWN TO ALL FRIENDS AT THE TABLE)</label>
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter your name (e.g. Jithin, Rahul)..."
-                  maxLength={16}
-                  autoFocus
-                />
+                <div className="lounge-name-save-row">
+                  <input
+                    type="text"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleNameChange(nickname);
+                      }
+                    }}
+                    placeholder="Enter your name (e.g. Jithin, Rahul)..."
+                    maxLength={16}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="home-save-name-btn"
+                    onClick={() => handleNameChange(nickname)}
+                  >
+                    <Check size={13} />
+                    <span>SAVE</span>
+                  </button>
+                </div>
               </div>
 
               {mpRole === 'offline' ? (

@@ -28,6 +28,7 @@ import { OpponentSeat } from './components/OpponentSeat';
 import { PlayerHand } from './components/PlayerHand';
 import { CardFlightLayer } from './components/CardFlightLayer';
 import { GameHUD } from './components/GameHUD';
+import { HomeScreen } from './components/HomeScreen';
 
 const INITIAL_PLAYERS_META: Array<{
   id: string;
@@ -133,12 +134,13 @@ export function App() {
   const [pendingPenalty, setPendingPenalty] = useState<number>(0);
   const [skippedPlayerId, setSkippedPlayerId] = useState<string | null>(null);
 
-  // Multiplayer & Player Identity state
+  // Home Screen & Player Identity state
+  const [showHomeScreen, setShowHomeScreen] = useState<boolean>(true);
   const [myPlayerName, setMyPlayerName] = useState<string>(() => {
     try {
-      return localStorage.getItem('uno_player_name') || 'Player 1';
+      return localStorage.getItem('uno_player_name') || 'Commander';
     } catch {
-      return 'Player 1';
+      return 'Commander';
     }
   });
   const [initialInviteCode, setInitialInviteCode] = useState<string>('');
@@ -276,24 +278,12 @@ export function App() {
   useEffect(() => {
     startNewMatch(mode, [true, false, true, false]);
 
+    // If URL has ?room=XXXXX, pre-fill the room code on the HomeScreen so the friend can type/save their name and click JOIN TABLE
     const params = new URLSearchParams(window.location.search);
     const inviteRoom = params.get('room');
     if (inviteRoom && inviteRoom.trim()) {
-      const cleanRoom = inviteRoom.trim().toUpperCase();
-      setInitialInviteCode(cleanRoom);
-      let savedName = '';
-      try {
-        savedName = localStorage.getItem('uno_player_name') || '';
-      } catch {}
-      const joinName = savedName || `Player_${Math.floor(10 + Math.random() * 89)}`;
-      setMyPlayerName(joinName);
-      mpManager
-        .joinRoom(cleanRoom, joinName)
-        .then(() => {
-          setMpRole('client');
-          setRoomCode(cleanRoom);
-        })
-        .catch(() => {});
+      setInitialInviteCode(inviteRoom.trim().toUpperCase());
+      setShowHomeScreen(true);
     }
 
     return () => {
@@ -1054,12 +1044,38 @@ export function App() {
     }
   };
 
+  const handleSaveMyName = useCallback(
+    (newName: string) => {
+      const clean = newName.trim();
+      if (!clean) return;
+      setMyPlayerName(clean);
+      try {
+        localStorage.setItem('uno_player_name', clean);
+      } catch {}
+      if (mpRole === 'client') {
+        mpManager.sendActionToHost({
+          type: 'UPDATE_NAME',
+          seatIndex: mySeatIndex,
+          playerName: clean,
+        });
+      } else {
+        setPlayers((prev) =>
+          prev.map((p, idx) =>
+            idx === mySeatIndex ? { ...p, name: clean } : p
+          )
+        );
+      }
+    },
+    [mpRole, mySeatIndex]
+  );
+
   // AI Turn Controller: bots take 5 to 10 seconds (5000ms - 10000ms) per turn
   const activeSeatIsAI =
     Boolean(players[turnIndex]?.isAI) && Boolean(players[turnIndex]?.isActive);
 
   useEffect(() => {
     if (
+      showHomeScreen ||
       mpRole === 'client' ||
       players.length === 0 ||
       activeTotalPlayers < 2 ||
@@ -1081,6 +1097,7 @@ export function App() {
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
     };
   }, [
+    showHomeScreen,
     mpRole,
     turnIndex,
     activeSeatIsAI,
@@ -1158,7 +1175,12 @@ export function App() {
           discardPile={discardPile}
           activeColor={activeColor}
           direction={direction}
-          isPlayerTurn={isMyTurn && !pendingWildCard && !awaitingMySevenSwap}
+          isPlayerTurn={
+            !showHomeScreen &&
+            isMyTurn &&
+            !pendingWildCard &&
+            !awaitingMySevenSwap
+          }
           pendingPenalty={pendingPenalty}
           onDrawCard={() => {
             if (mpRole === 'client') {
@@ -1176,145 +1198,186 @@ export function App() {
         <CardFlightLayer flights={flights} effects={effects} />
       </PoolTableStage>
 
-      {/* FOREGROUND PLAYER HAND — AUTOMATICALLY ORGANIZED INTO COLOR GROUPS */}
-      <PlayerHand
-        cards={myPlayer.hand}
-        topCard={topDiscard}
-        activeColor={activeColor}
-        isPlayerTurn={isMyTurn && !pendingWildCard && !awaitingMySevenSwap}
-        pendingPenalty={pendingPenalty}
-        onPlayCard={handlePlayerPlayCard}
-      />
+      {!showHomeScreen && (
+        <>
+          {/* FOREGROUND PLAYER HAND — AUTOMATICALLY ORGANIZED INTO COLOR GROUPS */}
+          <PlayerHand
+            cards={myPlayer.hand}
+            topCard={topDiscard}
+            activeColor={activeColor}
+            isPlayerTurn={isMyTurn && !pendingWildCard && !awaitingMySevenSwap}
+            pendingPenalty={pendingPenalty}
+            onPlayCard={handlePlayerPlayCard}
+          />
 
-      {/* MINIMAL COMPETITIVE GAMING HUD WITH 1v1 / 1v3 / MANUAL BOT CONTROLS */}
-      <GameHUD
-        mode={mode}
-        sevenZeroRule={sevenZeroRule}
-        myPlayerName={myPlayer.name || myPlayerName}
-        activePlayer={activePlayer}
-        playerCardCount={myPlayer.hand.length}
-        activeBotCount={activeBotCount}
-        activeTotalPlayers={activeTotalPlayers}
-        isPlayerTurn={isMyTurn}
-        hasCalledUno={myPlayer.calledUno}
-        muted={muted}
-        awaitingWildColor={Boolean(pendingWildCard)}
-        awaitingSevenSwap={awaitingMySevenSwap}
-        winner={
-          winner
-            ? {
-                ...winner,
-                seat: getRelativeSeat(
-                  players.findIndex((p) => p.id === winner.id),
-                  mySeatIndex
-                ),
-              }
-            : null
-        }
-        mpRole={mpRole}
-        roomCode={roomCode}
-        initialInviteCode={initialInviteCode}
-        connectedFriendsCount={connectedFriendsCount}
-        mpStatusText={mpStatusText}
-        onUpdateMyName={(newName) => {
-          const clean = newName.trim();
-          if (!clean) return;
-          setMyPlayerName(clean);
-          try {
-            localStorage.setItem('uno_player_name', clean);
-          } catch {}
-          if (mpRole === 'client') {
-            mpManager.sendActionToHost({
-              type: 'UPDATE_NAME',
-              seatIndex: mySeatIndex,
-              playerName: clean,
-            });
-          } else {
-            setPlayers((prev) =>
-              prev.map((p, idx) =>
-                idx === mySeatIndex ? { ...p, name: clean } : p
-              )
-            );
-          }
-        }}
-        onHostOnlineRoom={async (hostName) => {
-          const code = await mpManager.startHosting(hostName);
-          setMpRole('host');
-          setRoomCode(code);
-          setMySeatIndex(0);
-          // Automatically remove all bots when hosting an online room so friends can play pure 1v1 without bots!
-          setPlayers((prev) =>
-            prev.map((p, idx) =>
-              idx === 0
-                ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
-                : p.isAI
-                ? { ...p, isActive: false }
-                : p
-            )
-          );
-          setTurnIndex(0);
-          return code;
-        }}
-        onJoinOnlineRoom={async (codeToJoin, guestName) => {
-          await mpManager.joinRoom(codeToJoin, guestName);
-          setMpRole('client');
-          setRoomCode(codeToJoin.toUpperCase());
-        }}
-        onLeaveOnlineRoom={() => {
-          mpManager.disconnect();
-          setMpRole('offline');
-          setRoomCode('');
-          setMySeatIndex(0);
-          setConnectedFriendsCount(0);
-          startNewMatch(mode, [true, false, true, false]);
-        }}
-        onSetBotPreset={handleSetBotPreset}
-        onToggleMode={() => {
-          const nextMode: GameMode =
-            mode === 'no_mercy' ? 'classic' : 'no_mercy';
-          setMode(nextMode);
-          startNewMatch(nextMode);
-        }}
-        onToggleSevenZero={() => setSevenZeroRule((prev) => !prev)}
-        onToggleMute={() => {
-          soundFX.muted = !muted;
-          setMuted(!muted);
-        }}
-        onCallUno={() => {
-          soundFX.playSpecialEffect('uno');
-          if (mpRole === 'client') {
-            mpManager.sendActionToHost({
-              type: 'CALL_UNO',
-              seatIndex: mySeatIndex,
-            });
-          } else {
-            setPlayers((prev) =>
-              prev.map((p, idx) =>
-                idx === mySeatIndex ? { ...p, calledUno: true } : p
-              )
-            );
-            triggerTableEffect({
-              type: 'wild_shift',
-              color: activeColor,
-              label: 'UNO CALLED!',
-            });
-          }
-        }}
-        onDrawCard={() => {
-          if (isMyTurn && !pendingWildCard && !awaitingMySevenSwap) {
-            if (mpRole === 'client') {
-              mpManager.sendActionToHost({
-                type: 'DRAW_CARD',
-                seatIndex: mySeatIndex,
-              });
-            } else {
-              executePlayerDraw(mySeatIndex);
+          {/* MINIMAL COMPETITIVE GAMING HUD WITH 1v1 / 1v3 / MANUAL BOT CONTROLS */}
+          <GameHUD
+            mode={mode}
+            sevenZeroRule={sevenZeroRule}
+            myPlayerName={myPlayer.name || myPlayerName}
+            activePlayer={activePlayer}
+            playerCardCount={myPlayer.hand.length}
+            activeBotCount={activeBotCount}
+            activeTotalPlayers={activeTotalPlayers}
+            isPlayerTurn={isMyTurn}
+            hasCalledUno={myPlayer.calledUno}
+            muted={muted}
+            awaitingWildColor={Boolean(pendingWildCard)}
+            awaitingSevenSwap={awaitingMySevenSwap}
+            winner={
+              winner
+                ? {
+                    ...winner,
+                    seat: getRelativeSeat(
+                      players.findIndex((p) => p.id === winner.id),
+                      mySeatIndex
+                    ),
+                  }
+                : null
             }
-          }
-        }}
-        onSelectWildColor={handleSelectWildColor}
-        onNewMatch={() => startNewMatch(mode)}
-      />
+            mpRole={mpRole}
+            roomCode={roomCode}
+            initialInviteCode={initialInviteCode}
+            connectedFriendsCount={connectedFriendsCount}
+            mpStatusText={mpStatusText}
+            onUpdateMyName={handleSaveMyName}
+            onHostOnlineRoom={async (hostName) => {
+              handleSaveMyName(hostName);
+              const code = await mpManager.startHosting(hostName);
+              setMpRole('host');
+              setRoomCode(code);
+              setMySeatIndex(0);
+              setPlayers((prev) =>
+                prev.map((p, idx) =>
+                  idx === 0
+                    ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
+                    : p.isAI
+                    ? { ...p, isActive: false }
+                    : p
+                )
+              );
+              setTurnIndex(0);
+              return code;
+            }}
+            onJoinOnlineRoom={async (codeToJoin, guestName) => {
+              handleSaveMyName(guestName);
+              await mpManager.joinRoom(codeToJoin, guestName);
+              setMpRole('client');
+              setRoomCode(codeToJoin.toUpperCase());
+            }}
+            onLeaveOnlineRoom={() => {
+              mpManager.disconnect();
+              setMpRole('offline');
+              setRoomCode('');
+              setMySeatIndex(0);
+              setConnectedFriendsCount(0);
+              startNewMatch(mode, [true, false, true, false]);
+              setShowHomeScreen(true);
+            }}
+            onSetBotPreset={handleSetBotPreset}
+            onToggleMode={() => {
+              const nextMode: GameMode =
+                mode === 'no_mercy' ? 'classic' : 'no_mercy';
+              setMode(nextMode);
+              startNewMatch(nextMode);
+            }}
+            onToggleSevenZero={() => setSevenZeroRule((prev) => !prev)}
+            onToggleMute={() => {
+              soundFX.muted = !muted;
+              setMuted(!muted);
+            }}
+            onCallUno={() => {
+              soundFX.playSpecialEffect('uno');
+              if (mpRole === 'client') {
+                mpManager.sendActionToHost({
+                  type: 'CALL_UNO',
+                  seatIndex: mySeatIndex,
+                });
+              } else {
+                setPlayers((prev) =>
+                  prev.map((p, idx) =>
+                    idx === mySeatIndex ? { ...p, calledUno: true } : p
+                  )
+                );
+                triggerTableEffect({
+                  type: 'wild_shift',
+                  color: activeColor,
+                  label: 'UNO CALLED!',
+                });
+              }
+            }}
+            onDrawCard={() => {
+              if (isMyTurn && !pendingWildCard && !awaitingMySevenSwap) {
+                if (mpRole === 'client') {
+                  mpManager.sendActionToHost({
+                    type: 'DRAW_CARD',
+                    seatIndex: mySeatIndex,
+                  });
+                } else {
+                  executePlayerDraw(mySeatIndex);
+                }
+              }
+            }}
+            onSelectWildColor={handleSelectWildColor}
+            onNewMatch={() => {
+              setShowHomeScreen(true);
+            }}
+          />
+        </>
+      )}
+
+      {/* CINEMATIC BILLIARDS HOME SCREEN OVERLAY */}
+      {showHomeScreen && (
+        <HomeScreen
+          savedName={myPlayer.name || myPlayerName}
+          mode={mode}
+          sevenZeroRule={sevenZeroRule}
+          initialInviteCode={initialInviteCode}
+          mpRole={mpRole}
+          roomCode={roomCode}
+          connectedFriendsCount={connectedFriendsCount}
+          mpStatusText={mpStatusText}
+          onSavePlayerName={handleSaveMyName}
+          onStartQuickPlay={(preset) => {
+            handleSetBotPreset(preset);
+            setShowHomeScreen(false);
+          }}
+          onToggleMode={() => {
+            const nextMode: GameMode =
+              mode === 'no_mercy' ? 'classic' : 'no_mercy';
+            setMode(nextMode);
+            startNewMatch(nextMode);
+          }}
+          onToggleSevenZero={() => setSevenZeroRule((prev) => !prev)}
+          onHostOnlineRoom={async (hostName) => {
+            handleSaveMyName(hostName);
+            const code = await mpManager.startHosting(hostName);
+            setMpRole('host');
+            setRoomCode(code);
+            setMySeatIndex(0);
+            setPlayers((prev) =>
+              prev.map((p, idx) =>
+                idx === 0
+                  ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
+                  : p.isAI
+                  ? { ...p, isActive: false }
+                  : p
+              )
+            );
+            setTurnIndex(0);
+            return code;
+          }}
+          onJoinOnlineRoom={async (codeToJoin, guestName) => {
+            handleSaveMyName(guestName);
+            await mpManager.joinRoom(codeToJoin, guestName);
+            setMpRole('client');
+            setRoomCode(codeToJoin.toUpperCase());
+          }}
+          onEnterOnlineTable={() => {
+            setShowHomeScreen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
