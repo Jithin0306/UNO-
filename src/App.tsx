@@ -143,6 +143,16 @@ export function App() {
       return 'Commander';
     }
   });
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem('uno_player_avatar') ||
+        INITIAL_PLAYERS_META[0].avatarUrl
+      );
+    } catch {
+      return INITIAL_PLAYERS_META[0].avatarUrl;
+    }
+  });
   const [initialInviteCode, setInitialInviteCode] = useState<string>('');
   const [mpRole, setMpRole] = useState<'offline' | 'host' | 'client'>('offline');
   const [roomCode, setRoomCode] = useState<string>('');
@@ -249,6 +259,12 @@ export function App() {
                 : existing
                 ? existing.name
                 : meta.name,
+            avatarUrl:
+              idx === 0
+                ? myAvatarUrl
+                : existing
+                ? existing.avatarUrl
+                : meta.avatarUrl,
             title:
               existing && !existing.isEliminated
                 ? existing.title
@@ -276,7 +292,7 @@ export function App() {
       setSkippedPlayerId(null);
       setWinner(null);
     },
-    [mode, myPlayerName]
+    [mode, myPlayerName, myAvatarUrl]
   );
 
   useEffect(() => {
@@ -1120,7 +1136,7 @@ export function App() {
   useEffect(() => {
     mpManager.onStatusChange = (txt) => setMpStatusText(txt);
 
-    mpManager.onClientJoined = (seatIdx, friendName) => {
+    mpManager.onClientJoined = (seatIdx, friendName, friendAvatarUrl) => {
       if (aiTimerRef.current && turnIndex === seatIdx) {
         window.clearTimeout(aiTimerRef.current);
       }
@@ -1131,6 +1147,7 @@ export function App() {
             ? {
                 ...p,
                 name: friendName,
+                avatarUrl: friendAvatarUrl || p.avatarUrl,
                 title: 'ONLINE FRIEND',
                 isAI: false,
                 isActive: true,
@@ -1152,6 +1169,7 @@ export function App() {
             ? {
                 ...p,
                 name: INITIAL_PLAYERS_META[seatIdx].name,
+                avatarUrl: INITIAL_PLAYERS_META[seatIdx].avatarUrl,
                 title: INITIAL_PLAYERS_META[seatIdx].title,
                 isAI: true,
                 isActive: false, // Leave seat empty when friend disconnects unless a bot is manually added
@@ -1189,13 +1207,18 @@ export function App() {
         }
       } else if (msg.type === 'UPDATE_NAME') {
         const cleanName = msg.playerName.trim();
-        if (cleanName) {
-          setPlayers((prev) =>
-            prev.map((p, idx) =>
-              idx === msg.seatIndex ? { ...p, name: cleanName } : p
-            )
-          );
-        }
+        setPlayers((prev) =>
+          prev.map((p, idx) =>
+            idx === msg.seatIndex
+              ? {
+                  ...p,
+                  name: cleanName || p.name,
+                  avatarUrl:
+                    msg.avatarUrl !== undefined ? msg.avatarUrl : p.avatarUrl,
+                }
+              : p
+          )
+        );
       }
     };
 
@@ -1386,6 +1409,7 @@ export function App() {
           type: 'UPDATE_NAME',
           seatIndex: mySeatIndex,
           playerName: clean,
+          avatarUrl: myAvatarUrl,
         });
       } else {
         setPlayers((prev) =>
@@ -1395,7 +1419,39 @@ export function App() {
         );
       }
     },
-    [mpRole, mySeatIndex]
+    [mpRole, mySeatIndex, myAvatarUrl]
+  );
+
+  const handleSaveMyAvatar = useCallback(
+    (newAvatarUrl: string) => {
+      const targetAvatar =
+        newAvatarUrl && newAvatarUrl.trim()
+          ? newAvatarUrl.trim()
+          : INITIAL_PLAYERS_META[0].avatarUrl;
+      setMyAvatarUrl(targetAvatar);
+      try {
+        if (targetAvatar === INITIAL_PLAYERS_META[0].avatarUrl) {
+          localStorage.removeItem('uno_player_avatar');
+        } else {
+          localStorage.setItem('uno_player_avatar', targetAvatar);
+        }
+      } catch {}
+      if (mpRole === 'client') {
+        mpManager.sendActionToHost({
+          type: 'UPDATE_NAME',
+          seatIndex: mySeatIndex,
+          playerName: myPlayerName,
+          avatarUrl: targetAvatar,
+        });
+      } else {
+        setPlayers((prev) =>
+          prev.map((p, idx) =>
+            idx === mySeatIndex ? { ...p, avatarUrl: targetAvatar } : p
+          )
+        );
+      }
+    },
+    [mpRole, mySeatIndex, myPlayerName]
   );
 
   // AI Turn Controller: bots take 5 to 10 seconds (5000ms - 10000ms) per turn
@@ -1545,6 +1601,7 @@ export function App() {
             mode={mode}
             sevenZeroRule={sevenZeroRule}
             myPlayerName={myPlayer.name || myPlayerName}
+            myAvatarUrl={myPlayer.avatarUrl || myAvatarUrl}
             activePlayer={activePlayer}
             playerCardCount={myPlayer.hand.length}
             activeBotCount={activeBotCount}
@@ -1571,6 +1628,7 @@ export function App() {
             connectedFriendsCount={connectedFriendsCount}
             mpStatusText={mpStatusText}
             onUpdateMyName={handleSaveMyName}
+            onUpdateMyAvatar={handleSaveMyAvatar}
             onHostOnlineRoom={async (hostName) => {
               handleSaveMyName(hostName);
               const code = await mpManager.startHosting(hostName);
@@ -1580,7 +1638,13 @@ export function App() {
               setPlayers((prev) =>
                 prev.map((p, idx) =>
                   idx === 0
-                    ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
+                    ? {
+                        ...p,
+                        name: hostName,
+                        avatarUrl: myAvatarUrl,
+                        title: 'ROOM HOST',
+                        isActive: true,
+                      }
                     : p.isAI
                     ? { ...p, isActive: false }
                     : p
@@ -1591,7 +1655,7 @@ export function App() {
             }}
             onJoinOnlineRoom={async (codeToJoin, guestName) => {
               handleSaveMyName(guestName);
-              await mpManager.joinRoom(codeToJoin, guestName);
+              await mpManager.joinRoom(codeToJoin, guestName, myAvatarUrl);
               setMpRole('client');
               setRoomCode(codeToJoin.toUpperCase());
             }}
@@ -1660,6 +1724,7 @@ export function App() {
       {showHomeScreen && (
         <HomeScreen
           savedName={myPlayer.name || myPlayerName}
+          savedAvatarUrl={myPlayer.avatarUrl || myAvatarUrl}
           mode={mode}
           sevenZeroRule={sevenZeroRule}
           initialInviteCode={initialInviteCode}
@@ -1668,6 +1733,7 @@ export function App() {
           connectedFriendsCount={connectedFriendsCount}
           mpStatusText={mpStatusText}
           onSavePlayerName={handleSaveMyName}
+          onSavePlayerAvatar={handleSaveMyAvatar}
           onStartQuickPlay={(preset) => {
             handleSetBotPreset(preset);
             setShowHomeScreen(false);
@@ -1688,7 +1754,13 @@ export function App() {
             setPlayers((prev) =>
               prev.map((p, idx) =>
                 idx === 0
-                  ? { ...p, name: hostName, title: 'ROOM HOST', isActive: true }
+                  ? {
+                      ...p,
+                      name: hostName,
+                      avatarUrl: myAvatarUrl,
+                      title: 'ROOM HOST',
+                      isActive: true,
+                    }
                   : p.isAI
                   ? { ...p, isActive: false }
                   : p
@@ -1699,7 +1771,7 @@ export function App() {
           }}
           onJoinOnlineRoom={async (codeToJoin, guestName) => {
             handleSaveMyName(guestName);
-            await mpManager.joinRoom(codeToJoin, guestName);
+            await mpManager.joinRoom(codeToJoin, guestName, myAvatarUrl);
             setMpRole('client');
             setRoomCode(codeToJoin.toUpperCase());
           }}

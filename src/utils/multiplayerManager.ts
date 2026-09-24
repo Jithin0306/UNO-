@@ -38,6 +38,7 @@ export type ClientActionMessage =
   | {
       type: 'JOIN_HELLO';
       playerName: string;
+      avatarUrl?: string;
     }
   | {
       type: 'PLAY_CARD';
@@ -62,6 +63,7 @@ export type ClientActionMessage =
       type: 'UPDATE_NAME';
       seatIndex: number;
       playerName: string;
+      avatarUrl?: string;
     };
 
 export interface HostBroadcastMessage {
@@ -83,7 +85,11 @@ export class MultiplayerRoomManager {
   public roomCode: string = '';
   public mySeatIndex: number = 0;
 
-  public onClientJoined?: (seatIndex: number, playerName: string) => void;
+  public onClientJoined?: (
+    seatIndex: number,
+    playerName: string,
+    avatarUrl?: string
+  ) => void;
   public onClientLeft?: (seatIndex: number) => void;
   public onClientAction?: (msg: ClientActionMessage) => void;
   public onStateReceived?: (
@@ -154,7 +160,8 @@ export class MultiplayerRoomManager {
           if (msg.type === 'JOIN_HELLO') {
             this.onClientJoined?.(
               assignedSeat,
-              msg.playerName || `Player ${assignedSeat + 1}`
+              msg.playerName || `Player ${assignedSeat + 1}`,
+              msg.avatarUrl
             );
           } else {
             // Ensure action always uses the verified assignedSeat for this connection
@@ -178,7 +185,11 @@ export class MultiplayerRoomManager {
     });
   }
 
-  public joinRoom(roomCode: string, playerName: string): Promise<void> {
+  public joinRoom(
+    roomCode: string,
+    playerName: string,
+    avatarUrl?: string
+  ): Promise<void> {
     this.disconnect();
     const cleanCode = roomCode.trim().toUpperCase().replace(/^#/, '');
     this.roomCode = cleanCode;
@@ -199,6 +210,7 @@ export class MultiplayerRoomManager {
           conn.send({
             type: 'JOIN_HELLO',
             playerName: playerName.trim() || 'Friend',
+            avatarUrl,
           } satisfies ClientActionMessage);
           resolve();
         });

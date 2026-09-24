@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
+  Camera,
+  RotateCcw,
   Zap,
   Settings,
   Globe,
@@ -18,9 +20,14 @@ import {
 } from 'lucide-react';
 import { GameMode, UnoCardData } from '../types/uno';
 import { UnoCard } from './UnoCard';
+import {
+  compressAvatarImageFile,
+  DEFAULT_HUMAN_AVATAR,
+} from '../utils/avatarImage';
 
 interface HomeScreenProps {
   savedName: string;
+  savedAvatarUrl: string;
   mode: GameMode;
   sevenZeroRule: boolean;
   initialInviteCode: string;
@@ -29,6 +36,7 @@ interface HomeScreenProps {
   connectedFriendsCount: number;
   mpStatusText: string;
   onSavePlayerName: (name: string) => void;
+  onSavePlayerAvatar: (avatarUrl: string) => void;
   onStartQuickPlay: (preset: '1v1' | '1v3' | 'no_bots') => void;
   onToggleMode: () => void;
   onToggleSevenZero: () => void;
@@ -108,6 +116,7 @@ const SHOWCASE_FAN_CARDS: Array<{
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   savedName,
+  savedAvatarUrl,
   mode,
   sevenZeroRule,
   initialInviteCode,
@@ -116,6 +125,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   connectedFriendsCount,
   mpStatusText,
   onSavePlayerName,
+  onSavePlayerAvatar,
   onStartQuickPlay,
   onToggleMode,
   onToggleSevenZero,
@@ -127,6 +137,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     savedName && savedName !== 'Player 1' ? savedName : 'Commander'
   );
   const [nameSavedToast, setNameSavedToast] = useState(false);
+  const [avatarSavedToast, setAvatarSavedToast] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<
     'main' | 'custom' | 'online' | 'rules'
   >(initialInviteCode ? 'online' : 'main');
@@ -154,6 +166,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setNameSavedToast(true);
     window.setTimeout(() => setNameSavedToast(false), 1800);
     return clean;
+  };
+
+  const handleAvatarFileSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressAvatarImageFile(file);
+      onSavePlayerAvatar(dataUrl);
+      setAvatarSavedToast(true);
+      window.setTimeout(() => setAvatarSavedToast(false), 2000);
+    } catch {
+      setErrorMsg('Could not load selected image file.');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleCopyInvite = () => {
@@ -279,15 +308,73 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="nm-glass-card">
           <div className="nm-glass-top-highlight" />
 
-          {/* PLAYER NAME CAPSULE WITH INTEGRATED SAVE BUTTON */}
+          {/* PLAYER IDENTITY & LOCAL GALLERY PROFILE PICTURE UPLOADER */}
           <div className="nm-profile-block">
             <div className="nm-profile-label-row">
-              <span>PLAYER IDENTITY</span>
+              <span>PLAYER PROFILE &amp; PHOTO</span>
               <span className="nm-profile-status">
-                {nameSavedToast
+                {avatarSavedToast
+                  ? '✓ PHOTO UPLOADED & SYNCED'
+                  : nameSavedToast
                   ? '✓ NAME SAVED & SYNCED'
                   : `ACTIVE: ${(nameInput.trim() || savedName || 'Commander').toUpperCase()}`}
               </span>
+            </div>
+
+            {/* Hidden Local Gallery File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileSelected}
+              style={{ display: 'none' }}
+              aria-label="Upload Profile Picture from Local File Gallery"
+            />
+
+            <div className="nm-profile-avatar-row">
+              <button
+                type="button"
+                className="nm-avatar-preview-trigger"
+                onClick={() => fileInputRef.current?.click()}
+                title="Click to choose Profile Picture from your file gallery"
+              >
+                <img
+                  src={savedAvatarUrl || DEFAULT_HUMAN_AVATAR}
+                  alt="Player Profile Avatar"
+                  className="nm-avatar-preview-img"
+                />
+                <span className="nm-avatar-camera-badge">
+                  <Camera size={11} />
+                </span>
+              </button>
+
+              <div className="nm-avatar-actions-col">
+                <div className="nm-avatar-actions-btns">
+                  <button
+                    type="button"
+                    className="nm-upload-photo-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera size={13} />
+                    <span>UPLOAD PHOTO</span>
+                  </button>
+                  {savedAvatarUrl &&
+                    savedAvatarUrl !== DEFAULT_HUMAN_AVATAR && (
+                      <button
+                        type="button"
+                        className="nm-reset-photo-btn"
+                        onClick={() => onSavePlayerAvatar(DEFAULT_HUMAN_AVATAR)}
+                        title="Reset to default profile picture"
+                      >
+                        <RotateCcw size={12} />
+                        <span>RESET</span>
+                      </button>
+                    )}
+                </div>
+                <span className="nm-avatar-helper-hint">
+                  Choose any JPG, PNG, or WEBP photo from your device gallery
+                </span>
+              </div>
             </div>
 
             <div className="nm-profile-input-capsule">

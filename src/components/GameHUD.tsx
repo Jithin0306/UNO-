@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Volume2,
@@ -10,13 +10,19 @@ import {
   Wifi,
   Bot,
   Edit3,
+  Camera,
 } from 'lucide-react';
 import { ActiveColor, GameMode, Player } from '../types/uno';
+import {
+  compressAvatarImageFile,
+  DEFAULT_HUMAN_AVATAR,
+} from '../utils/avatarImage';
 
 interface GameHUDProps {
   mode: GameMode;
   sevenZeroRule: boolean;
   myPlayerName: string;
+  myAvatarUrl: string;
   activePlayer: Player;
   playerCardCount: number;
   activeBotCount: number;
@@ -33,6 +39,7 @@ interface GameHUDProps {
   connectedFriendsCount: number;
   mpStatusText: string;
   onUpdateMyName: (newName: string) => void;
+  onUpdateMyAvatar: (newAvatarUrl: string) => void;
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
   onLeaveOnlineRoom: () => void;
@@ -50,6 +57,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   mode,
   sevenZeroRule,
   myPlayerName,
+  myAvatarUrl,
   activePlayer,
   playerCardCount,
   activeBotCount,
@@ -66,6 +74,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   connectedFriendsCount,
   mpStatusText,
   onUpdateMyName,
+  onUpdateMyAvatar,
   onHostOnlineRoom,
   onJoinOnlineRoom,
   onLeaveOnlineRoom,
@@ -83,6 +92,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [avatarUpdatedToast, setAvatarUpdatedToast] = useState(false);
+  const hudFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // When an invite link (?room=XXXXX) is opened, automatically pop open the modal with the code pre-filled so the friend enters their name!
   useEffect(() => {
@@ -118,6 +129,23 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const trimmed = val.trim();
     if (trimmed.length > 0) {
       onUpdateMyName(trimmed);
+    }
+  };
+
+  const handleHudAvatarSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressAvatarImageFile(file);
+      onUpdateMyAvatar(dataUrl);
+      setAvatarUpdatedToast(true);
+      window.setTimeout(() => setAvatarUpdatedToast(false), 2000);
+    } catch {
+      // ignore invalid file
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -210,14 +238,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* BOTTOM FOREGROUND CONTROLS INTEGRATED INTO THE TABLE */}
       <div className="hud-bottom-table-bar">
-        {/* Left: Your Player Name Badge & Your Cards Count */}
+        {/* Left: Your Player Avatar, Name Badge & Your Cards Count */}
         <div className="hud-bottom-left-meta">
           <button
             type="button"
             className="your-player-name-pill"
             onClick={() => setShowRoomModal(true)}
-            title="Click to change your display name"
+            title="Click to change your Profile Picture or Display Name"
           >
+            <img
+              src={myAvatarUrl || DEFAULT_HUMAN_AVATAR}
+              alt={myPlayerName}
+              className="your-pill-avatar"
+            />
             <span className="your-name-tag">{myPlayerName}</span>
             <Edit3 size={11} className="name-edit-icon" />
           </button>
@@ -320,7 +353,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <div className="lounge-modal-header">
                 <div className="lounge-title-group">
                   <Wifi size={16} className="gold-icon" />
-                  <h3>PRIVATE BILLIARDS LOUNGE • PLAYER & ROOM</h3>
+                  <h3>PLAYER PROFILE &amp; ONLINE LOUNGE</h3>
                 </div>
                 <button
                   type="button"
@@ -329,6 +362,69 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 >
                   ✕
                 </button>
+              </div>
+
+              {/* PROFILE PICTURE GALLERY UPLOADER */}
+              <div className="lounge-input-group">
+                <label>
+                  YOUR PROFILE PICTURE{' '}
+                  {avatarUpdatedToast
+                    ? '— ✓ PHOTO UPDATED & SYNCED!'
+                    : '(UPLOAD FROM LOCAL GALLERY)'}
+                </label>
+                <input
+                  ref={hudFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHudAvatarSelected}
+                  style={{ display: 'none' }}
+                />
+                <div className="nm-profile-avatar-row">
+                  <button
+                    type="button"
+                    className="nm-avatar-preview-trigger"
+                    onClick={() => hudFileInputRef.current?.click()}
+                    title="Click to upload photo from your device gallery"
+                  >
+                    <img
+                      src={myAvatarUrl || DEFAULT_HUMAN_AVATAR}
+                      alt={myPlayerName}
+                      className="nm-avatar-preview-img"
+                    />
+                    <span className="nm-avatar-camera-badge">
+                      <Camera size={11} />
+                    </span>
+                  </button>
+
+                  <div className="nm-avatar-actions-col">
+                    <div className="nm-avatar-actions-btns">
+                      <button
+                        type="button"
+                        className="nm-upload-photo-btn"
+                        onClick={() => hudFileInputRef.current?.click()}
+                      >
+                        <Camera size={13} />
+                        <span>CHOOSE FROM GALLERY</span>
+                      </button>
+                      {myAvatarUrl &&
+                        myAvatarUrl !== DEFAULT_HUMAN_AVATAR && (
+                          <button
+                            type="button"
+                            className="nm-reset-photo-btn"
+                            onClick={() =>
+                              onUpdateMyAvatar(DEFAULT_HUMAN_AVATAR)
+                            }
+                          >
+                            <RotateCcw size={12} />
+                            <span>RESET</span>
+                          </button>
+                        )}
+                    </div>
+                    <span className="nm-avatar-helper-hint">
+                      Shown on your seat to all connected friends at the table
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="lounge-input-group">
