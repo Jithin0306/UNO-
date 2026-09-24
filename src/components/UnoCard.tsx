@@ -21,6 +21,8 @@ function getCornerLabel(value: CardValue): string {
       return '⇄';
     case 'draw2':
       return '+2';
+    case 'draw4':
+      return '+4';
     case 'skip_all':
       return '⊘⊘';
     case 'discard_all':
@@ -35,6 +37,8 @@ function getCornerLabel(value: CardValue): string {
       return '+6';
     case 'wild_draw10':
       return '+10';
+    case 'wild_color_roulette':
+      return '🎡';
     default:
       return value;
   }
@@ -93,13 +97,16 @@ function renderCenterArtwork(card: UnoCardData) {
       );
 
     case 'draw2':
+    case 'draw4':
       return (
         <div className="uno-card-special-stack">
           <div className="mini-stack-cards">
             <span className="mini-card-layer layer-back" />
             <span className="mini-card-layer layer-front" />
           </div>
-          <span className="special-plus-badge">+2</span>
+          <span className="special-plus-badge">
+            {value === 'draw4' ? '+4' : '+2'}
+          </span>
         </div>
       );
 
@@ -160,6 +167,19 @@ function renderCenterArtwork(card: UnoCardData) {
             <span className="wq wq-green" />
           </div>
           <span className="wild-wordmark">WILD</span>
+        </div>
+      );
+
+    case 'wild_color_roulette':
+      return (
+        <div className="uno-wild-emblem">
+          <div className="wild-quad-oval">
+            <span className="wq wq-red" />
+            <span className="wq wq-blue" />
+            <span className="wq wq-yellow" />
+            <span className="wq wq-green" />
+          </div>
+          <span className="wild-wordmark">ROULETTE</span>
         </div>
       );
 

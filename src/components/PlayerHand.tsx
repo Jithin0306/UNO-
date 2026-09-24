@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActiveColor, UnoCardData } from '../types/uno';
 import { groupSortedHandByColor } from '../utils/handSorting';
@@ -24,6 +24,15 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   onPlayCard,
 }) => {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [winWidth, setWinWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1366
+  );
+
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Automatically sort and partition into strict color groups:
   // RED (numbers -> specials) | BLUE (numbers -> specials) | GREEN | YELLOW | WILD
@@ -32,43 +41,58 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   const groupCount = colorGroups.length;
 
   /**
-   * Dynamic responsive spacing so 20, 25, or 40+ cards fit comfortably inside the screen
-   * without overflowing horizontally or sinking off the bottom edge of the viewport:
-   * - Card width for `md`/`lg` is ~102px-116px.
-   * - We dynamically adjust `overlapMarginPx`, `groupGapPx`, and `cardSize` based on `totalCards`.
+   * Exact responsive geometry so 100% of cards ALWAYS fit within the screen
+   * at 100% default browser zoom (no horizontal clipping or off-screen overflow):
+   * - Card width for `md` is 102px, `lg` is 116px.
+   * - Each overlap card adds `(cardWidthPx + overlapMarginPx)` to total width.
+   * - Therefore: `overlapMarginPx = ((availableW - totalGroupGaps - groupCount * cardWidthPx) / totalOverlaps) - cardWidthPx`.
    */
-  const useCompactCardSize = totalCards >= 16;
-  const cardWidthPx = useCompactCardSize ? 96 : 114;
+  const useCompactCardSize = totalCards >= 11 || winWidth < 1360;
+  const cardWidthPx = useCompactCardSize ? 102 : 116;
 
-  // Available safe horizontal width on desktop/laptop (~88% of viewport width)
-  const viewportW =
-    typeof window !== 'undefined' ? Math.min(window.innerWidth * 0.92, 1680) : 1360;
+  // Leave generous horizontal safety margin (80px total) so even rotated edge cards stay 100% inside the 100% zoom viewport
+  const availableW = Math.max(340, winWidth - 84);
 
   // Gap between color groups (Red | Blue | Green | Yellow | Wild)
   const groupGapPx =
-    totalCards <= 10
-      ? 26
-      : totalCards <= 16
-      ? 20
-      : totalCards <= 24
+    totalCards <= 9
+      ? 22
+      : totalCards <= 14
       ? 16
-      : 13;
+      : totalCards <= 19
+      ? 12
+      : 9;
 
   const totalGroupGapsWidth = Math.max(0, groupCount - 1) * groupGapPx;
   const totalOverlapsCount = Math.max(1, totalCards - groupCount);
 
-  // Calculate ideal negative margin so the entire hand fits within `viewportW`
-  const rawRequiredStep =
-    (viewportW - totalGroupGapsWidth - groupCount * cardWidthPx) /
+  // Net horizontal advance allowed per overlapping card so the entire hand fits in `availableW`
+  const allowedStepPerOverlap =
+    (availableW - totalGroupGapsWidth - groupCount * cardWidthPx) /
     totalOverlapsCount;
 
-  // Clamp negative overlap so corner numbers/symbols always stay readable (min 22px visible strip per card)
-  const minOverlapMargin = -(cardWidthPx - 23);
-  const maxOverlapMargin = useCompactCardSize ? -34 : -36;
+  // Convert step advance to CSS `margin-left`: `margin = step - cardWidthPx`
+  const rawNegativeMargin = Math.floor(allowedStepPerOverlap - cardWidthPx);
+
+  // Keep at least 24px of each card's left edge visible so corner numbers/symbols are always readable
+  const minOverlapMargin = -(cardWidthPx - 24);
+  const maxOverlapMargin = useCompactCardSize ? -38 : -36;
   const dynamicOverlapMarginPx = Math.max(
     minOverlapMargin,
-    Math.min(maxOverlapMargin, Math.floor(rawRequiredStep))
+    Math.min(maxOverlapMargin, rawNegativeMargin)
   );
+
+  // Compute exact resulting row width; if still wider than `availableW` (e.g., 22-24 cards on a small laptop),
+  // scale the row down proportionally so 100% of cards are guaranteed visible on screen at 100% zoom!
+  const estimatedRowWidth =
+    totalGroupGapsWidth +
+    groupCount * cardWidthPx +
+    totalOverlapsCount * (cardWidthPx + dynamicOverlapMarginPx);
+
+  const rowAutoScale =
+    estimatedRowWidth > availableW
+      ? Math.max(0.68, (availableW - 16) / estimatedRowWidth)
+      : 1;
 
   let runningCardIndex = 0;
 
@@ -85,7 +109,11 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
         <motion.div
           layout
           className="player-hand-groups-row"
-          style={{ gap: `${groupGapPx}px` }}
+          style={{
+            gap: `${groupGapPx}px`,
+            transform: `scale(${rowAutoScale})`,
+            transformOrigin: 'bottom center',
+          }}
         >
           <AnimatePresence initial={false} mode="popLayout">
             {colorGroups.map((group, groupIdx) => {
@@ -100,8 +128,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   initial={{ opacity: 0, y: 24, scale: 0.9 }}
                   animate={{
                     opacity: 1,
-                    // Clamp group vertical curve to max 6px so large hands never sink off-screen
-                    y: Math.abs(normalizedGroupOffset) * 6,
+                    y: Math.abs(normalizedGroupOffset) * 5,
                     scale: 1,
                   }}
                   exit={{ opacity: 0, scale: 0.85, y: 15 }}
@@ -121,12 +148,13 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                       const globalIndex = runningCardIndex++;
                       const normalizedPos =
                         totalCards > 1
-                          ? (globalIndex / (totalCards - 1)) * 2 - 1 // Always in range [-1, +1] regardless of card count!
+                          ? (globalIndex / (totalCards - 1)) * 2 - 1
                           : 0;
 
-                      // Bounded fan angle (max ±9deg even with 35 cards!) and bounded arch drop (max 10px!)
-                      const fanAngle = normalizedPos * (totalCards > 18 ? 6.5 : 9.5);
-                      const archDrop = Math.pow(Math.abs(normalizedPos), 1.6) * 9;
+                      const fanAngle =
+                        normalizedPos * (totalCards > 16 ? 5.5 : 8.5);
+                      const archDrop =
+                        Math.pow(Math.abs(normalizedPos), 1.6) * 8;
 
                       const isPlayable =
                         isPlayerTurn &&
@@ -150,7 +178,11 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                           }}
                           animate={{
                             opacity: 1,
-                            y: isHovered ? -38 : isPlayable ? archDrop - 6 : archDrop,
+                            y: isHovered
+                              ? -38
+                              : isPlayable
+                              ? archDrop - 6
+                              : archDrop,
                             scale: isHovered ? 1.16 : 1,
                             rotate: isHovered ? 0 : fanAngle,
                           }}
@@ -169,7 +201,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                           }}
                           style={{
                             marginLeft:
-                              idxInGroup > 0 ? `${dynamicOverlapMarginPx}px` : '0px',
+                              idxInGroup > 0
+                                ? `${dynamicOverlapMarginPx}px`
+                                : '0px',
                             zIndex: isHovered ? 200 : 20 + globalIndex,
                           }}
                           onMouseEnter={() => {

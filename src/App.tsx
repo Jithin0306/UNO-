@@ -249,9 +249,13 @@ export function App() {
                 : existing
                 ? existing.name
                 : meta.name,
-            title: existing ? existing.title : meta.title,
+            title:
+              existing && !existing.isEliminated
+                ? existing.title
+                : meta.title,
             isAI: existing ? existing.isAI : meta.isAI,
             isActive: idx === 0 ? true : isActive,
+            isEliminated: false,
             hand:
               idx === 0
                 ? deal.playerHand
@@ -390,18 +394,50 @@ export function App() {
   const handleSetBotPreset = useCallback(
     (preset: '1v1' | '1v3' | 'no_bots') => {
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
+      setWinner(null);
+      setPendingPenalty(0);
+      setPendingWildCard(null);
+      setAwaitingSevenSwapForSeat(null);
+
       setPlayers((prev) => {
-        const hasOnlineFriends = prev.some((p, i) => i > 0 && !p.isAI && p.isActive);
+        const hasOnlineFriends = prev.some(
+          (p, i) => i > 0 && !p.isAI && p.isActive
+        );
+        const deal = dealInitialHands(mode);
+
         const updated = prev.map((p, idx) => {
-          if (idx === 0) return { ...p, isActive: true };
+          if (idx === 0) {
+            return {
+              ...p,
+              isActive: true,
+              isEliminated: false,
+              title: 'CHALLENGER',
+              hand: deal.playerHand,
+              calledUno: false,
+            };
+          }
           // Never kick a connected human friend
-          if (!p.isAI && p.isActive) return p;
+          if (!p.isAI && p.isActive) {
+            return {
+              ...p,
+              isEliminated: false,
+              hand:
+                deal.opponentHands[(idx - 1) as 0 | 1 | 2] ??
+                sortHandCards(createDeck(mode).slice(0, 7)),
+              calledUno: false,
+            };
+          }
 
           if (preset === 'no_bots') {
-            return { ...p, isAI: true, isActive: false };
+            return {
+              ...p,
+              isAI: true,
+              isActive: false,
+              isEliminated: false,
+              hand: [],
+            };
           }
           if (preset === '1v1') {
-            // If an online friend is already in the room, 1v1 needs 0 bots; otherwise activate Top seat (idx === 2)
             const shouldActivateBot = !hasOnlineFriends && idx === 2;
             return {
               ...p,
@@ -409,10 +445,9 @@ export function App() {
               title: INITIAL_PLAYERS_META[idx].title,
               isAI: true,
               isActive: shouldActivateBot,
-              hand:
-                p.hand.length > 0
-                  ? p.hand
-                  : sortHandCards(createDeck(mode).slice(0, 7)),
+              isEliminated: false,
+              hand: deal.opponentHands[(idx - 1) as 0 | 1 | 2],
+              calledUno: false,
             };
           }
           // '1v3': activate all 3 seats
@@ -422,19 +457,126 @@ export function App() {
             title: INITIAL_PLAYERS_META[idx].title,
             isAI: true,
             isActive: true,
-            hand:
-              p.hand.length > 0
-                ? p.hand
-                : sortHandCards(createDeck(mode).slice(0, 7)),
+            isEliminated: false,
+            hand: deal.opponentHands[(idx - 1) as 0 | 1 | 2],
+            calledUno: false,
           };
         });
 
+        setDrawPile(deal.drawPile);
+        setDiscardPile(deal.discardPile);
+        setActiveColor(deal.initialColor);
         setTurnIndex(0);
+        setDirection(1);
         return updated;
       });
     },
     [mode]
   );
+
+  // Official Mattel UNO Show 'Em No Mercy™ — 25-Card Elimination Helper
+  const evaluateMercyRule = useCallback(
+    (
+      candidatePlayers: Player[],
+      currentDeck: UnoCardData[]
+    ): {
+      survivorsUpdated: Player[];
+      reshuffledDeck: UnoCardData[];
+      eliminatedNames: string[];
+      mercyWinner: Player | null;
+    } => {
+      if (mode !== 'no_mercy') {
+        return {
+          survivorsUpdated: candidatePlayers,
+          reshuffledDeck: currentDeck,
+          eliminatedNames: [],
+          mercyWinner: null,
+        };
+      }
+
+      let deckPool = [...currentDeck];
+      const eliminatedNames: string[] = [];
+
+      const survivorsUpdated = candidatePlayers.map((p) => {
+        if (p.isActive && !p.isEliminated && p.hand.length >= 25) {
+          eliminatedNames.push(`${p.name} (${p.hand.length} cards)`);
+          // Official Rulebook: "Set aside their hand of cards until the deck runs out and needs to be reshuffled."
+          deckPool = [...deckPool, ...p.hand];
+          return {
+            ...p,
+            isActive: false,
+            isEliminated: true,
+            title: `KNOCKED OUT (${p.hand.length} CARDS)`,
+            hand: [],
+            calledUno: false,
+          };
+        }
+        return p;
+      });
+
+      const remainingActive = survivorsUpdated.filter(
+        (p) => p.isActive && !p.isEliminated
+      );
+
+      let mercyWinner: Player | null = null;
+      if (eliminatedNames.length > 0 && remainingActive.length === 1) {
+        mercyWinner = remainingActive[0];
+      }
+
+      return {
+        survivorsUpdated,
+        reshuffledDeck: deckPool,
+        eliminatedNames,
+        mercyWinner,
+      };
+    },
+    [mode]
+  );
+
+  // Continuous safety guard: if any active player ever holds >= 25 cards in No Mercy mode, immediately eliminate them
+  useEffect(() => {
+    if (mode !== 'no_mercy' || winner) return;
+    const hasOverLimit = players.some(
+      (p) => p.isActive && !p.isEliminated && p.hand.length >= 25
+    );
+    if (!hasOverLimit) return;
+
+    const {
+      survivorsUpdated,
+      reshuffledDeck,
+      eliminatedNames,
+      mercyWinner,
+    } = evaluateMercyRule(players, drawPile);
+
+    if (eliminatedNames.length > 0) {
+      soundFX.playSpecialEffect('penalty');
+      triggerTableEffect({
+        type: 'mercy_ko',
+        color: 'red',
+        label: `💀 MERCY RULE (25+ CARDS)! ${eliminatedNames
+          .join(', ')
+          .toUpperCase()} KNOCKED OUT!`,
+      });
+      setDrawPile(reshuffledDeck);
+      setPlayers(survivorsUpdated);
+      if (mercyWinner) {
+        setWinner(mercyWinner);
+        soundFX.playSpecialEffect('win');
+      } else {
+        setTurnIndex((prevTurn) =>
+          getNextActivePlayerIndex(prevTurn, direction, 1, survivorsUpdated)
+        );
+      }
+    }
+  }, [
+    mode,
+    players,
+    winner,
+    drawPile,
+    direction,
+    evaluateMercyRule,
+    triggerTableEffect,
+  ]);
 
   // Core card play resolution (authoritative on Host / Offline)
   const commitCardPlay = useCallback(
@@ -471,6 +613,8 @@ export function App() {
         mySeatIndex,
         true
       );
+
+      let nextDeckPool = [...drawPile];
 
       let nextPlayers = players.map((p, idx) => {
         if (idx !== playerIdx) return p;
@@ -515,8 +659,10 @@ export function App() {
         setDirection(nextDir);
         soundFX.playSpecialEffect('reverse');
 
-        // In 1v1 (2 active players), Reverse acts like Skip so the player plays again!
-        if (activePlayersCount === 2 && card.value === 'reverse') {
+        // Official Mattel Rulebook:
+        // - With 2 players, Reverse skips the other player so you take another turn (stepAdvance = 2).
+        // - With 2 players, Wild Reverse Draw 4 skips the other player and targets YOU with +4 (unless you stack it back!).
+        if (activePlayersCount === 2) {
           stepAdvance = 2;
         }
 
@@ -524,7 +670,9 @@ export function App() {
           type: 'reverse',
           color: nextColor,
           label:
-            activePlayersCount === 2 && card.value === 'reverse'
+            activePlayersCount === 2 && card.value === 'wild_reverse_draw4'
+              ? '⇄ WILD REVERSE +4 (2P: STACK OR DRAW 4!)'
+              : activePlayersCount === 2 && card.value === 'reverse'
               ? '⇄ REVERSE (1v1 SKIP)'
               : '⇄ DIRECTION REVERSED',
         });
@@ -564,6 +712,57 @@ export function App() {
         });
       }
 
+      // Official Wild Color Roulette Rule (Page 2 of Rulebook):
+      // Next player reveals cards one at a time from Draw Pile until they get a card of `nextColor` (Wilds do NOT count),
+      // adds all revealed cards to their hand, and loses their turn!
+      if (card.value === 'wild_color_roulette') {
+        const rouletteVictimIdx = getNextActivePlayerIndex(
+          playerIdx,
+          nextDir,
+          1,
+          nextPlayers
+        );
+        const revealedCards: UnoCardData[] = [];
+        let pool = [...nextDeckPool];
+        if (pool.length < 30) {
+          pool = [...pool, ...createDeck(mode)];
+        }
+        while (pool.length > 0) {
+          const pulled = pool.shift()!;
+          revealedCards.push(pulled);
+          // Stop if revealed card matches `nextColor` (Wild cards do NOT count) OR victim hits 25-card Mercy limit
+          if (
+            pulled.color === nextColor ||
+            nextPlayers[rouletteVictimIdx].hand.length + revealedCards.length >= 25
+          ) {
+            break;
+          }
+        }
+        nextDeckPool = pool;
+        nextPlayers = nextPlayers.map((p, idx) =>
+          idx === rouletteVictimIdx
+            ? {
+                ...p,
+                hand: sortHandCards([...p.hand, ...revealedCards]),
+                calledUno: false,
+              }
+            : p
+        );
+        stepAdvance = 2; // Victim loses their turn
+        soundFX.playSpecialEffect('penalty');
+        triggerTableEffect({
+          type: 'color_roulette',
+          color: nextColor,
+          targetSeat: getRelativeSeat(rouletteVictimIdx, mySeatIndex),
+          penaltyAmount: revealedCards.length,
+          label: `🎡 ROULETTE! ${nextPlayers[
+            rouletteVictimIdx
+          ].name.toUpperCase()} DREW +${
+            revealedCards.length
+          } UNTIL ${nextColor.toUpperCase()}`,
+        });
+      }
+
       const addedPenalty = getPenaltyValue(card.value);
       if (addedPenalty > 0) {
         nextPenalty += addedPenalty;
@@ -572,7 +771,7 @@ export function App() {
         const targetIdx = getNextActivePlayerIndex(
           playerIdx,
           nextDir,
-          1,
+          stepAdvance,
           nextPlayers
         );
         triggerTableEffect({
@@ -584,7 +783,7 @@ export function App() {
         });
       }
 
-      if (sevenZeroRule && card.value === '0') {
+      if ((sevenZeroRule || mode === 'no_mercy') && card.value === '0') {
         const snapshotHands = nextPlayers.map((p) => p.hand);
         nextPlayers = nextPlayers.map((p, idx) => {
           if (!p.isActive) return p;
@@ -603,13 +802,12 @@ export function App() {
         triggerTableEffect({
           type: 'zero_rotate',
           color: nextColor,
-          label: '0 RULE • ALL HANDS ROTATED!',
+          label: "0'S PASS • ALL HANDS PASSED IN DIRECTION OF PLAY!",
         });
       }
 
-      if (sevenZeroRule && card.value === '7') {
+      if ((sevenZeroRule || mode === 'no_mercy') && card.value === '7') {
         if (!actingPlayer.isAI) {
-          // If 1v1 (only 1 active opponent), swap immediately with that opponent without needing an extra click!
           const otherActive = nextPlayers.filter(
             (p, i) => p.isActive && i !== playerIdx
           );
@@ -629,11 +827,12 @@ export function App() {
             triggerTableEffect({
               type: 'seven_swap',
               color: nextColor,
-              label: `7 RULE • SWAPPED HANDS WITH ${nextPlayers[
+              label: `7'S SWAP • SWAPPED HANDS WITH ${nextPlayers[
                 otherIdx
               ].name.toUpperCase()}`,
             });
           } else {
+            setDrawPile(nextDeckPool);
             setPlayers(nextPlayers);
             setAwaitingSevenSwapForSeat(playerIdx);
             return;
@@ -659,41 +858,110 @@ export function App() {
           triggerTableEffect({
             type: 'seven_swap',
             color: nextColor,
-            label: `7 RULE • ${actingPlayer.name.toUpperCase()} SWAPPED WITH ${nextPlayers[
+            label: `7'S SWAP • ${actingPlayer.name.toUpperCase()} SWAPPED WITH ${nextPlayers[
               bestTargetIdx
             ].name.toUpperCase()}`,
           });
         }
       }
 
-      setPlayers(nextPlayers);
+      // Check 25-Card Mercy Rule after any card play / Roulette / 7-0 hand swap
+      const {
+        survivorsUpdated,
+        reshuffledDeck,
+        eliminatedNames,
+        mercyWinner,
+      } = evaluateMercyRule(nextPlayers, nextDeckPool);
+
+      if (eliminatedNames.length > 0) {
+        triggerTableEffect({
+          type: 'mercy_ko',
+          color: 'red',
+          label: `💀 MERCY RULE (25+ CARDS)! ${eliminatedNames
+            .join(', ')
+            .toUpperCase()} KNOCKED OUT!`,
+        });
+      }
+
+      setDrawPile(reshuffledDeck);
+      setPlayers(survivorsUpdated);
+
+      if (mercyWinner) {
+        setWinner(mercyWinner);
+        soundFX.playSpecialEffect('win');
+        return;
+      }
+
       const nextTurn = getNextActivePlayerIndex(
         playerIdx,
         nextDir,
         stepAdvance,
-        nextPlayers
+        survivorsUpdated
       );
       setTurnIndex(nextTurn);
     },
     [
       players,
+      drawPile,
+      mode,
       direction,
       pendingPenalty,
       sevenZeroRule,
       mySeatIndex,
+      evaluateMercyRule,
       spawnNetworkFlight,
       triggerTableEffect,
     ]
   );
 
-  // Draw Card(s) for any active player
+  // Draw Card(s) for any active player — Enforces Official "Draw Until Playable" & "25-Card Mercy Rule"
   const executePlayerDraw = useCallback(
     (playerIdx: number) => {
       const targetPlayer = players[playerIdx];
       if (!targetPlayer || !targetPlayer.isActive) return;
 
-      const drawCount = pendingPenalty > 0 ? pendingPenalty : 1;
-      const { drawn, nextDeck } = pullCardsFromDeck(drawCount, drawPile);
+      const topCard =
+        discardPile[discardPile.length - 1] ?? {
+          id: 'fallback',
+          color: activeColor,
+          value: '0',
+          category: 'number',
+        };
+
+      let pool = [...drawPile];
+      if (pool.length < 35) {
+        pool = [...pool, ...createDeck(mode)];
+      }
+
+      let drawn: UnoCardData[] = [];
+
+      if (pendingPenalty > 0) {
+        // Taking a stacked penalty (+2, +4, +6, +10, etc.)
+        drawn = pool.splice(0, pendingPenalty);
+      } else if (mode === 'no_mercy') {
+        // Official Mattel Rulebook (Page 1):
+        // "If you DO NOT HAVE a matching card, you MUST draw cards from the Draw Pile UNTIL YOU DRAW A CARD YOU CAN PLAY."
+        // (If player already had a matching card and chose to draw 1, draw 1; otherwise draw until playable or until hitting 25 cards!)
+        const alreadyHasPlayable = targetPlayer.hand.some((c) =>
+          canPlayCard(c, topCard, activeColor, 0)
+        );
+        if (alreadyHasPlayable) {
+          drawn = pool.splice(0, 1);
+        } else {
+          while (pool.length > 0) {
+            const card = pool.shift()!;
+            drawn.push(card);
+            const reachedMercyLimit =
+              targetPlayer.hand.length + drawn.length >= 25;
+            const isMatch = canPlayCard(card, topCard, activeColor, 0);
+            if (isMatch || reachedMercyLimit) {
+              break;
+            }
+          }
+        }
+      } else {
+        drawn = pool.splice(0, 1);
+      }
 
       soundFX.playCardDraw();
 
@@ -704,22 +972,25 @@ export function App() {
           playerIdx,
           mySeatIndex,
           playerIdx === mySeatIndex,
-          i * 90
+          i * 85
         );
       });
 
-      if (pendingPenalty > 0) {
+      if (pendingPenalty > 0 || drawn.length > 1) {
         soundFX.playSpecialEffect('penalty');
         triggerTableEffect({
           type: 'draw_penalty',
           color: activeColor,
           targetSeat: getRelativeSeat(playerIdx, mySeatIndex),
-          penaltyAmount: drawCount,
-          label: `${targetPlayer.name.toUpperCase()} DREW +${drawCount}`,
+          penaltyAmount: drawn.length,
+          label:
+            pendingPenalty > 0
+              ? `${targetPlayer.name.toUpperCase()} DREW PENALTY +${drawn.length}`
+              : `${targetPlayer.name.toUpperCase()} DREW ${drawn.length} UNTIL PLAYABLE`,
         });
       }
 
-      const nextPlayers = players.map((p, idx) => {
+      const candidatePlayers = players.map((p, idx) => {
         if (idx !== playerIdx) return p;
         return {
           ...p,
@@ -728,21 +999,65 @@ export function App() {
         };
       });
 
-      setDrawPile(nextDeck);
-      setPlayers(nextPlayers);
+      // Immediately enforce the 25-Card Mercy Rule!
+      const {
+        survivorsUpdated,
+        reshuffledDeck,
+        eliminatedNames,
+        mercyWinner,
+      } = evaluateMercyRule(candidatePlayers, pool);
+
+      if (eliminatedNames.length > 0) {
+        soundFX.playSpecialEffect('penalty');
+        triggerTableEffect({
+          type: 'mercy_ko',
+          color: 'red',
+          targetSeat: getRelativeSeat(playerIdx, mySeatIndex),
+          label: `💀 MERCY RULE (25+ CARDS)! ${eliminatedNames
+            .join(', ')
+            .toUpperCase()} KNOCKED OUT!`,
+        });
+      }
+
+      setDrawPile(reshuffledDeck);
+      setPlayers(survivorsUpdated);
       setPendingPenalty(0);
+
+      if (mercyWinner) {
+        setWinner(mercyWinner);
+        soundFX.playSpecialEffect('win');
+        return;
+      }
+
+      // If player took a penalty OR was knocked out OR has no playable card, advance turn.
+      // If in No Mercy mode they drew until they got a playable card (and weren't taking a penalty),
+      // let a human player play that card right away, or advance turn for AI/after penalty!
+      const lastDrawnCard = drawn[drawn.length - 1];
+      const canPlayLastDrawn =
+        pendingPenalty === 0 &&
+        survivorsUpdated[playerIdx]?.isActive &&
+        lastDrawnCard &&
+        canPlayCard(lastDrawnCard, topCard, activeColor, 0);
+
+      if (canPlayLastDrawn && !survivorsUpdated[playerIdx].isAI) {
+        // Keep turn on the human player so they can immediately play the card they drew (per Official Rulebook!)
+        return;
+      }
+
       setTurnIndex(
-        getNextActivePlayerIndex(playerIdx, direction, 1, nextPlayers)
+        getNextActivePlayerIndex(playerIdx, direction, 1, survivorsUpdated)
       );
     },
     [
       players,
+      discardPile,
       pendingPenalty,
       drawPile,
+      mode,
       activeColor,
       direction,
       mySeatIndex,
-      pullCardsFromDeck,
+      evaluateMercyRule,
       spawnNetworkFlight,
       triggerTableEffect,
     ]
@@ -773,18 +1088,32 @@ export function App() {
       triggerTableEffect({
         type: 'seven_swap',
         color: activeColor,
-        label: `7 RULE • ${updated[sourceSeatIdx].name.toUpperCase()} SWAPPED WITH ${updated[
+        label: `7'S SWAP • ${updated[sourceSeatIdx].name.toUpperCase()} SWAPPED WITH ${updated[
           targetIdx
         ].name.toUpperCase()}`,
       });
 
-      setPlayers(updated);
+      const {
+        survivorsUpdated,
+        reshuffledDeck,
+        mercyWinner,
+      } = evaluateMercyRule(updated, drawPile);
+
+      setDrawPile(reshuffledDeck);
+      setPlayers(survivorsUpdated);
       setAwaitingSevenSwapForSeat(null);
+
+      if (mercyWinner) {
+        setWinner(mercyWinner);
+        soundFX.playSpecialEffect('win');
+        return;
+      }
+
       setTurnIndex(
-        getNextActivePlayerIndex(sourceSeatIdx, direction, 1, updated)
+        getNextActivePlayerIndex(sourceSeatIdx, direction, 1, survivorsUpdated)
       );
     },
-    [players, activeColor, direction, triggerTableEffect]
+    [players, drawPile, activeColor, direction, evaluateMercyRule, triggerTableEffect]
   );
 
   // Configure PeerJS callbacks so Host processes Client actions and Clients apply Host state

@@ -50,8 +50,9 @@ export function createDeck(mode: GameMode): UnoCardData[] {
       deck.push(makeCard(color, 'draw2', 'special'));
     }
 
-    // No Mercy additional specials
+    // No Mercy additional specials (Page 2 of Official Rulebook: Draw Four, Skip Everyone, Discard All)
     if (mode === 'no_mercy') {
+      deck.push(makeCard(color, 'draw4', 'special'));
       deck.push(makeCard(color, 'skip_all', 'special'));
       deck.push(makeCard(color, 'discard_all', 'special'));
     }
@@ -64,12 +65,14 @@ export function createDeck(mode: GameMode): UnoCardData[] {
   }
 
   if (mode === 'no_mercy') {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       deck.push(makeCard('wild', 'wild_reverse_draw4', 'wild'));
       deck.push(makeCard('wild', 'wild_draw6', 'wild'));
+      deck.push(makeCard('wild', 'wild_color_roulette', 'wild'));
     }
-    deck.push(makeCard('wild', 'wild_draw10', 'wild'));
-    deck.push(makeCard('wild', 'wild_draw10', 'wild'));
+    for (let i = 0; i < 2; i++) {
+      deck.push(makeCard('wild', 'wild_draw10', 'wild'));
+    }
   }
 
   return shuffleDeck(deck);
@@ -185,6 +188,7 @@ export function getPenaltyValue(value: CardValue): number {
   switch (value) {
     case 'draw2':
       return 2;
+    case 'draw4':
     case 'wild_draw4':
     case 'wild_reverse_draw4':
       return 4;

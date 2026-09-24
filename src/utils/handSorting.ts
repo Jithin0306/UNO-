@@ -41,13 +41,15 @@ const SPECIAL_VALUE_ORDER: Record<CardValue, number> = {
   skip: 20,
   reverse: 21,
   draw2: 22,
-  skip_all: 23,
-  discard_all: 24,
+  draw4: 23,
+  skip_all: 24,
+  discard_all: 25,
   wild: 40,
   wild_draw4: 41,
   wild_reverse_draw4: 42,
   wild_draw6: 43,
   wild_draw10: 44,
+  wild_color_roulette: 45,
 };
 
 /**

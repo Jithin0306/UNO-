@@ -7,6 +7,7 @@ export type ColoredSpecialValue =
   | 'skip'
   | 'reverse'
   | 'draw2'
+  | 'draw4'
   | 'skip_all'
   | 'discard_all';
 
@@ -15,7 +16,8 @@ export type WildSpecialValue =
   | 'wild_draw4'
   | 'wild_reverse_draw4'
   | 'wild_draw6'
-  | 'wild_draw10';
+  | 'wild_draw10'
+  | 'wild_color_roulette';
 
 export type CardValue = NumberValue | ColoredSpecialValue | WildSpecialValue;
 
@@ -47,6 +49,7 @@ export interface Player {
   isAI: boolean;
   isActive: boolean;
   calledUno: boolean;
+  isEliminated?: boolean;
 }
 
 export type GameMode = 'no_mercy' | 'classic';
@@ -67,7 +70,9 @@ export type SpecialEffectType =
   | 'seven_swap'
   | 'zero_rotate'
   | 'wild_shift'
-  | 'discard_all';
+  | 'discard_all'
+  | 'mercy_ko'
+  | 'color_roulette';
 
 export interface TableSpecialEffect {
   id: string;

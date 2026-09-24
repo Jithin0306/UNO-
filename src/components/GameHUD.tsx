@@ -248,9 +248,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <Edit3 size={11} className="name-edit-icon" />
           </button>
 
-          <div className="your-cards-counter-pill">
+          <div
+            className={`your-cards-counter-pill ${
+              mode === 'no_mercy' && playerCardCount >= 20
+                ? 'mercy-danger-zone'
+                : ''
+            }`}
+          >
             <span className="counter-caption">Your Cards:</span>
-            <span className="counter-value">{playerCardCount}</span>
+            <span className="counter-value">
+              {mode === 'no_mercy'
+                ? `${playerCardCount} / 25`
+                : playerCardCount}
+            </span>
           </div>
         </div>
 
@@ -504,7 +514,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         )}
       </AnimatePresence>
 
-      {/* SUBTLE VICTORY OVERLAY WHEN A ROUND COMPLETES */}
+      {/* SUBTLE VICTORY / MERCY KNOCKOUT OVERLAY WHEN A ROUND COMPLETES */}
       <AnimatePresence>
         {winner && (
           <motion.div
@@ -519,15 +529,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               initial={{ y: 30, scale: 0.92 }}
               animate={{ y: 0, scale: 1 }}
             >
-              <div className="victory-eyebrow">MATCH COMPLETE</div>
+              <div className="victory-eyebrow">
+                {winner.hand.length > 0
+                  ? '💀 MERCY RULE (25+ CARDS ELIMINATION)'
+                  : 'MATCH COMPLETE'}
+              </div>
               <h2 className="victory-headline">
                 {winner.seat === 'bottom'
-                  ? 'VICTORY AT THE TABLE'
+                  ? winner.hand.length > 0
+                    ? 'VICTORY BY KNOCKOUT!'
+                    : 'VICTORY AT THE TABLE'
+                  : winner.hand.length > 0
+                  ? `KNOCKED OUT! ${winner.name.toUpperCase()} WINS`
                   : `${winner.name.toUpperCase()} WINS THE HAND`}
               </h2>
               <p className="victory-sub">
                 {winner.seat === 'bottom'
-                  ? 'You cleared your final card across the emerald felt.'
+                  ? winner.hand.length > 0
+                    ? 'Every opponent reached 25+ cards and was knocked out by the Mercy Rule! (+250 KO Bonus)'
+                    : 'You cleared your final card across the emerald felt.'
+                  : winner.hand.length > 0
+                  ? 'You reached 25 or more cards in your hand and were eliminated by the No Mercy Rule!'
                   : `${winner.name} emptied their hand first.`}
               </p>
               {mpRole !== 'client' && (
