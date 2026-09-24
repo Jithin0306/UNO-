@@ -2248,7 +2248,7 @@ body,
 }
 
 /* ==================================================
-   HOME SCREEN OVERLAY (BILLIARDS DARK GREEN AESTHETIC)
+   HOME SCREEN OVERLAY (VIP HIGH-STAKES BILLIARDS LOUNGE)
    ================================================== */
 
 .home-screen-overlay {
@@ -2256,103 +2256,421 @@ body,
   inset: 0;
   z-index: 90;
   background: radial-gradient(
-    ellipse 85% 75% at 50% 45%,
-    rgba(3, 20, 12, 0.84) 0%,
-    rgba(1, 7, 4, 0.94) 65%,
-    rgba(0, 3, 2, 0.98) 100%
+    ellipse 92% 85% at 50% 38%,
+    rgba(6, 36, 22, 0.86) 0%,
+    rgba(2, 14, 8, 0.95) 58%,
+    rgba(0, 4, 2, 0.99) 100%
   );
-  backdrop-filter: blur(7px);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Overhead Chandelier Lamp Cone */
+.home-lamp-cone {
+  position: absolute;
+  top: -140px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 820px;
+  height: 520px;
+  background: radial-gradient(
+    ellipse at 50% 10%,
+    rgba(251, 191, 36, 0.22) 0%,
+    rgba(16, 185, 129, 0.11) 42%,
+    transparent 74%
+  );
+  filter: blur(18px);
+  pointer-events: none;
 }
 
 .home-ambient-glow {
   position: absolute;
-  width: 640px;
-  height: 420px;
+  width: 780px;
+  height: 520px;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(16, 185, 129, 0.14) 0%,
-    rgba(245, 158, 11, 0.06) 45%,
+    rgba(16, 185, 129, 0.16) 0%,
+    rgba(245, 158, 11, 0.08) 45%,
     transparent 72%
   );
   pointer-events: none;
 }
 
-.home-center-column {
+.home-felt-grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    rgba(251, 191, 36, 0.07) 1px,
+    transparent 1px
+  );
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, #000 20%, transparent 80%);
+  pointer-events: none;
+}
+
+.home-vip-stage {
   position: relative;
-  width: min(94vw, 430px);
+  width: min(95vw, 620px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 18px;
   z-index: 2;
 }
 
-.home-hero-branding {
+/* ==================================================
+   HERO CREST & 3D FANNED SHOWCASE CARDS
+   ================================================== */
+
+.home-hero-showcase {
+  position: relative;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  padding-top: 58px;
+}
+
+.home-fanned-cards-crown {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  height: 88px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-showcase-card {
+  position: absolute;
+  width: 56px;
+  height: 82px;
+  border-radius: 9px;
+  padding: 4px;
+  border: 1.5px solid rgba(253, 230, 138, 0.85);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.88),
+    0 0 18px rgba(245, 158, 11, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.hcard-corner {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 9px;
+  line-height: 1;
+  color: #fde68a;
+}
+
+.hcard-oval {
+  width: 82%;
+  height: 68%;
+  border-radius: 50%;
+  transform: rotate(-22deg);
+  border: 1.5px solid rgba(253, 230, 138, 0.78);
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
+.hcard-wild-oval {
+  background: conic-gradient(
+    from 45deg,
+    #dc2626 0deg 90deg,
+    #2563eb 90deg 180deg,
+    #eab308 180deg 270deg,
+    #16a34a 270deg 360deg
+  );
+  color: #fffbeb;
+  font-size: 16px;
+}
+
+.hcard-foil-glint {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.32) 48%,
+    transparent 70%
+  );
+}
+
+.card-red {
+  background: linear-gradient(145deg, #ef4444, #7f1d1d);
+}
+.card-green {
+  background: linear-gradient(145deg, #10b981, #064e3b);
+}
+.card-blue {
+  background: linear-gradient(145deg, #3b82f6, #1e3a8a);
+}
+.card-yellow {
+  background: linear-gradient(145deg, #f59e0b, #78350f);
+}
+.card-wild-ten {
+  background: linear-gradient(145deg, #1f2421, #050706);
+  border: 2px solid #fbbf24;
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.95),
+    0 0 26px rgba(251, 191, 36, 0.55);
+}
+
+.hcard-left-far {
+  left: 8px;
+  top: 18px;
+  z-index: 1;
+}
+.hcard-left-mid {
+  left: 48px;
+  top: 7px;
+  z-index: 2;
+}
+.hcard-center {
+  left: 92px;
+  top: -2px;
+  width: 60px;
+  height: 86px;
+  z-index: 4;
+}
+.hcard-right-mid {
+  right: 48px;
+  top: 7px;
+  z-index: 2;
+}
+.hcard-right-far {
+  right: 8px;
+  top: 18px;
+  z-index: 1;
+}
+
+.home-series-ribbon {
+  position: relative;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(8, 36, 23, 0.95), rgba(20, 14, 4, 0.95));
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: var(--gold-champagne);
+  margin-bottom: 4px;
+}
+
+.ribbon-crown-icon {
+  color: var(--gold-bright);
 }
 
 .home-hero-title {
+  position: relative;
+  z-index: 5;
   font-family: var(--font-condensed);
-  font-size: clamp(56px, 8vw, 76px);
+  font-size: clamp(60px, 9vw, 84px);
   font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: 3px;
+  line-height: 0.9;
+  letter-spacing: 4px;
   background: linear-gradient(
     180deg,
-    #ffffff 0%,
-    #fde68a 38%,
-    #f59e0b 75%,
-    #b45309 100%
+    #fffbeb 0%,
+    #fde68a 28%,
+    #f59e0b 62%,
+    #dc2626 95%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 6px 28px rgba(245, 158, 11, 0.42));
+  filter: drop-shadow(0 8px 28px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 0 26px rgba(245, 158, 11, 0.42));
+}
+
+.home-hero-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.brass-wing-line {
+  width: 44px;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--gold-bright), transparent);
 }
 
 .home-hero-subtitle {
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 5px;
+  letter-spacing: 5.5px;
   color: var(--gold-bright);
-  text-shadow: 0 2px 10px rgba(245, 158, 11, 0.4);
+  text-shadow: 0 2px 12px rgba(245, 158, 11, 0.5);
 }
 
 .home-hero-tagline {
+  margin-top: 6px;
   font-family: var(--font-sans);
-  font-size: 12px;
-  color: rgba(148, 163, 184, 0.85);
-  max-width: 360px;
+  font-size: 12.5px;
+  color: rgba(203, 213, 225, 0.88);
+  max-width: 470px;
   line-height: 1.45;
 }
 
+.text-gold {
+  color: var(--gold-champagne);
+}
+.text-crimson {
+  color: #f87171;
+}
+
+/* ==================================================
+   MAHOGANY & BRASS OUTER VIP CONSOLE FRAME
+   ================================================== */
+
+.home-mahogany-frame {
+  position: relative;
+  width: 100%;
+  padding: 7px;
+  border-radius: 26px;
+  background: linear-gradient(
+    145deg,
+    #3e1f0d 0%,
+    #1c0d06 38%,
+    #0f0704 70%,
+    #2e1608 100%
+  );
+  border: 1.5px solid rgba(251, 191, 36, 0.5);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.96),
+    0 0 40px rgba(16, 185, 129, 0.14),
+    inset 0 1px 1px rgba(253, 230, 138, 0.35);
+}
+
+.brass-corner-rivet {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fef08a, #b45309);
+  border: 1px solid #451a03;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  z-index: 4;
+}
+.rivet-tl { top: 10px; left: 10px; }
+.rivet-tr { top: 10px; right: 10px; }
+.rivet-bl { bottom: 10px; left: 10px; }
+.rivet-br { bottom: 10px; right: 10px; }
+
 .home-menu-card {
   width: 100%;
-  padding: 22px;
-  border-radius: 22px;
-  background: linear-gradient(165deg, #072014 0%, #030e09 100%);
-  border: 1.5px solid rgba(251, 191, 36, 0.35);
-  box-shadow:
-    0 28px 75px rgba(0, 0, 0, 0.95),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 20px 22px;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.16) 0%, transparent 65%),
+    linear-gradient(170deg, #072316 0%, #03110a 55%, #020905 100%);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  box-shadow: inset 0 0 36px rgba(0, 0, 0, 0.85);
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+/* ==================================================
+   VIP PLAYER IDENTITY PASS BAR
+   ================================================== */
+
+.home-vip-pass-bar {
+  padding: 12px 14px;
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(2, 12, 7, 0.92) 0%, rgba(1, 7, 4, 0.96) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.vip-pass-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vip-pass-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  color: var(--gold-champagne);
+}
+
+.vip-pass-sync-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  box-shadow: 0 0 8px var(--gold-bright);
+}
+
+.sync-dot.pulse-green {
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+}
+
 .home-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+}
+
+.vip-avatar-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: radial-gradient(circle, #0d3b26, #04140c);
+  border: 1.5px solid rgba(251, 191, 36, 0.55);
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.vip-avatar-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .home-name-input-wrap {
@@ -2360,16 +2678,17 @@ body,
   height: 42px;
   padding: 0 12px;
   border-radius: 11px;
-  background: rgba(1, 8, 5, 0.9);
+  background: rgba(4, 18, 11, 0.92);
   border: 1px solid rgba(251, 191, 36, 0.28);
   display: flex;
   align-items: center;
   gap: 9px;
+  transition: all 0.2s ease;
 }
 
 .home-name-input-wrap:focus-within {
   border-color: var(--gold-bright);
-  box-shadow: 0 0 14px rgba(251, 191, 36, 0.2);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.24);
 }
 
 .home-input-icon {
@@ -2394,37 +2713,280 @@ body,
   height: 42px;
   padding: 0 16px;
   border-radius: 11px;
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.26), rgba(180, 83, 9, 0.36));
+  border: 1.5px solid rgba(251, 191, 36, 0.68);
   color: var(--gold-champagne);
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1.8px;
+  letter-spacing: 1.6px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.18s ease;
 }
 
 .home-save-name-btn:hover {
-  background: rgba(245, 158, 11, 0.34);
-  border-color: var(--gold-bright);
-  color: #ffffff;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #fef08a;
+  color: #090d0b;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.45);
 }
 
 .home-save-name-btn.is-saved {
-  background: rgba(16, 185, 129, 0.28);
-  border-color: #34d399;
+  background: linear-gradient(135deg, #059669, #047857);
+  border-color: #6ee7b7;
   color: #ecfdf5;
 }
 
-.home-menu-buttons-stack {
+/* ==================================================
+   BENTO MODE SELECTION CARDS
+   ================================================== */
+
+.home-bento-layout {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+/* Featured 1v1 Quick Play Hero Banner Card */
+.bento-hero-play-card {
+  position: relative;
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 90% 20%, rgba(254, 240, 138, 0.25), transparent 55%),
+    linear-gradient(135deg, #b45309 0%, #7c2d12 52%, #451a03 100%);
+  border: 1.5px solid #fde68a;
+  box-shadow:
+    0 12px 30px rgba(180, 83, 9, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.bento-hero-play-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 36px rgba(245, 158, 11, 0.52),
+    0 0 24px rgba(251, 191, 36, 0.35);
+}
+
+.bento-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bento-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  color: #fde68a;
+}
+
+.bento-hero-heading {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.bento-hero-desc {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: rgba(254, 243, 199, 0.88);
+}
+
+.bento-hero-cta-circle {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fef08a, #f59e0b);
+  border: 1.5px solid #ffffff;
+  color: #1c1917;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+}
+
+/* 2-Column Mode Grid */
+.bento-grid-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.bento-tile-card {
+  padding: 14px 15px;
+  border-radius: 15px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tile-emerald {
+  background: linear-gradient(160deg, rgba(10, 46, 30, 0.92) 0%, rgba(4, 20, 13, 0.96) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+}
+
+.tile-royal {
+  background: linear-gradient(160deg, rgba(8, 38, 34, 0.92) 0%, rgba(4, 18, 16, 0.96) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.38);
+}
+
+.bento-tile-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-bright);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.75), 0 0 18px rgba(251, 191, 36, 0.2);
+}
+
+.bento-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bento-tile-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-gold {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: var(--gold-bright);
+}
+
+.icon-emerald {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #34d399;
+}
+
+.bento-tile-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--gold-champagne);
+}
+
+.bento-tile-tag.tag-live {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #34d399;
+  color: #a7f3d0;
+}
+
+.bento-tile-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: #f8fafc;
+  margin-top: 2px;
+}
+
+.bento-tile-sub {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgba(148, 163, 184, 0.88);
+}
+
+/* Secondary Pill Row */
+.bento-utility-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
+
+.bento-secondary-pill {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 11px;
+  background: rgba(4, 18, 11, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.bento-secondary-pill:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-champagne);
+  background: rgba(9, 35, 22, 0.95);
+}
+
+/* Active Rules Status Footer */
+.home-active-rules-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.rule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(2, 10, 6, 0.85);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+/* ==================================================
+   SUBPANELS (CUSTOM MATCH, P2P ROOM, RULEBOOK)
+   ================================================== */
 
 .home-btn {
   width: 100%;
@@ -2491,16 +3053,21 @@ body,
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  padding: 5px 11px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: #cbd5e1;
   font-family: var(--font-display);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
   cursor: pointer;
+}
+
+.subpanel-back-btn:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-champagne);
 }
 
 .subpanel-title {
@@ -2530,9 +3097,9 @@ body,
 
 .seg-btn {
   flex: 1;
-  height: 36px;
+  height: 38px;
   border-radius: 9px;
-  background: rgba(2, 10, 6, 0.8);
+  background: rgba(2, 10, 6, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(226, 232, 240, 0.75);
   font-family: var(--font-display);
@@ -2540,10 +3107,11 @@ body,
   font-weight: 700;
   letter-spacing: 1.2px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .seg-btn.active {
-  background: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.24);
   border-color: var(--gold-bright);
   color: var(--gold-champagne);
 }
@@ -2581,7 +3149,7 @@ body,
 }
 
 .home-code-field {
-  width: 150px;
+  width: 165px;
   height: 46px;
   padding: 0 12px;
   border-radius: 12px;
@@ -2647,20 +3215,60 @@ body,
   text-align: center;
 }
 
-.home-rules-list {
-  display: flex;
-  flex-direction: column;
+/* Rulebook Mini Cards Grid */
+.rules-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  padding-left: 16px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgba(226, 232, 240, 0.88);
 }
 
-.home-rules-list strong {
-  color: var(--gold-champagne);
+.rule-mini-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(2, 12, 7, 0.88);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
+
+.rule-badge {
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+
+.badge-crimson { background: rgba(220, 38, 38, 0.25); color: #fca5a5; border: 1px solid #ef4444; }
+.badge-gold { background: rgba(245, 158, 11, 0.25); color: #fde68a; border: 1px solid #f59e0b; }
+.badge-emerald { background: rgba(16, 185, 129, 0.25); color: #a7f3d0; border: 1px solid #10b981; }
+.badge-royal { background: rgba(59, 130, 246, 0.25); color: #bfdbfe; border: 1px solid #3b82f6; }
+
+.rule-mini-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.rule-mini-card p {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(148, 163, 184, 0.88);
+}
+
+@media (max-width: 560px) {
+  .bento-grid-row,
+  .bento-utility-row,
+  .rules-grid-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
 
