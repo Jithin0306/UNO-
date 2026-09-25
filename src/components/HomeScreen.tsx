@@ -172,7 +172,7 @@ const FALLING_BG_CARDS: Array<{
     blur: 0.4,
   },
   {
-    card: { id: 'rain-4', color: 'yellow', value: 'reverse', category: 'action' },
+    card: { id: 'rain-4', color: 'yellow', value: 'reverse', category: 'special' },
     left: '22%',
     duration: 18.0,
     delay: -12.6,
@@ -182,7 +182,6 @@ const FALLING_BG_CARDS: Array<{
     startRot: 30,
     endRot: 240,
     blur: 1.4,
-    faceDown: true,
   },
   {
     card: { id: 'rain-5', color: 'green', value: 'skip_all', category: 'special' },
@@ -209,7 +208,7 @@ const FALLING_BG_CARDS: Array<{
     blur: 1.2,
   },
   {
-    card: { id: 'rain-7', color: 'red', value: 'draw2', category: 'action' },
+    card: { id: 'rain-7', color: 'red', value: 'draw2', category: 'special' },
     left: '46%',
     duration: 16.8,
     delay: -7.3,
@@ -219,7 +218,6 @@ const FALLING_BG_CARDS: Array<{
     startRot: -35,
     endRot: 175,
     blur: 1.5,
-    faceDown: true,
   },
   {
     card: { id: 'rain-8', color: 'blue', value: '0', category: 'number' },
@@ -256,7 +254,6 @@ const FALLING_BG_CARDS: Array<{
     startRot: 40,
     endRot: -160,
     blur: 1.0,
-    faceDown: true,
   },
   {
     card: { id: 'rain-11', color: 'green', value: '7', category: 'number' },
@@ -271,7 +268,7 @@ const FALLING_BG_CARDS: Array<{
     blur: 0.3,
   },
   {
-    card: { id: 'rain-12', color: 'red', value: 'skip', category: 'action' },
+    card: { id: 'rain-12', color: 'red', value: 'skip', category: 'special' },
     left: '88%',
     duration: 15.6,
     delay: -1.9,
@@ -307,7 +304,7 @@ const FALLING_BG_CARDS: Array<{
     blur: 1.1,
   },
   {
-    card: { id: 'rain-15', color: 'blue', value: 'reverse', category: 'action' },
+    card: { id: 'rain-15', color: 'blue', value: 'reverse', category: 'special' },
     left: '91%',
     duration: 18.4,
     delay: -13.2,
@@ -434,7 +431,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <UnoCard
                 card={item.card}
                 size="sm"
-                faceDown={Boolean(item.faceDown)}
                 playable={false}
               />
             </div>
