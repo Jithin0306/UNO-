@@ -122,6 +122,204 @@ const SHOWCASE_FAN_CARDS: Array<{
   },
 ];
 
+const FALLING_BG_CARDS: Array<{
+  card: UnoCardData;
+  left: string;
+  duration: number;
+  delay: number;
+  scale: number;
+  opacity: number;
+  swayX: number;
+  startRot: number;
+  endRot: number;
+  blur: number;
+  faceDown?: boolean;
+}> = [
+  {
+    card: { id: 'rain-1', color: 'red', value: '7', category: 'number' },
+    left: '3%',
+    duration: 13.5,
+    delay: -2.4,
+    scale: 0.62,
+    opacity: 0.42,
+    swayX: 28,
+    startRot: -25,
+    endRot: 195,
+    blur: 0,
+  },
+  {
+    card: { id: 'rain-2', color: 'wild', value: 'wild_draw10', category: 'wild' },
+    left: '9%',
+    duration: 16.2,
+    delay: -9.8,
+    scale: 0.48,
+    opacity: 0.3,
+    swayX: -22,
+    startRot: 15,
+    endRot: -185,
+    blur: 1,
+  },
+  {
+    card: { id: 'rain-3', color: 'blue', value: 'draw4', category: 'special' },
+    left: '15%',
+    duration: 14.8,
+    delay: -5.2,
+    scale: 0.56,
+    opacity: 0.36,
+    swayX: 34,
+    startRot: -40,
+    endRot: 160,
+    blur: 0.4,
+  },
+  {
+    card: { id: 'rain-4', color: 'yellow', value: 'reverse', category: 'action' },
+    left: '22%',
+    duration: 18.0,
+    delay: -12.6,
+    scale: 0.44,
+    opacity: 0.25,
+    swayX: -18,
+    startRot: 30,
+    endRot: 240,
+    blur: 1.4,
+    faceDown: true,
+  },
+  {
+    card: { id: 'rain-5', color: 'green', value: 'skip_all', category: 'special' },
+    left: '29%',
+    duration: 15.4,
+    delay: -3.7,
+    scale: 0.5,
+    opacity: 0.28,
+    swayX: 24,
+    startRot: -18,
+    endRot: -210,
+    blur: 0.8,
+  },
+  {
+    card: { id: 'rain-6', color: 'wild', value: 'wild_color_roulette', category: 'wild' },
+    left: '37%',
+    duration: 17.5,
+    delay: -14.1,
+    scale: 0.45,
+    opacity: 0.24,
+    swayX: -26,
+    startRot: 10,
+    endRot: 190,
+    blur: 1.2,
+  },
+  {
+    card: { id: 'rain-7', color: 'red', value: 'draw2', category: 'action' },
+    left: '46%',
+    duration: 16.8,
+    delay: -7.3,
+    scale: 0.42,
+    opacity: 0.22,
+    swayX: 20,
+    startRot: -35,
+    endRot: 175,
+    blur: 1.5,
+    faceDown: true,
+  },
+  {
+    card: { id: 'rain-8', color: 'blue', value: '0', category: 'number' },
+    left: '55%',
+    duration: 15.9,
+    delay: -11.0,
+    scale: 0.46,
+    opacity: 0.24,
+    swayX: -24,
+    startRot: 22,
+    endRot: -170,
+    blur: 1.2,
+  },
+  {
+    card: { id: 'rain-9', color: 'yellow', value: 'discard_all', category: 'special' },
+    left: '64%',
+    duration: 14.6,
+    delay: -4.5,
+    scale: 0.52,
+    opacity: 0.29,
+    swayX: 30,
+    startRot: -14,
+    endRot: 210,
+    blur: 0.8,
+  },
+  {
+    card: { id: 'rain-10', color: 'wild', value: 'wild_draw6', category: 'wild' },
+    left: '73%',
+    duration: 17.2,
+    delay: -15.4,
+    scale: 0.48,
+    opacity: 0.27,
+    swayX: -28,
+    startRot: 40,
+    endRot: -160,
+    blur: 1.0,
+    faceDown: true,
+  },
+  {
+    card: { id: 'rain-11', color: 'green', value: '7', category: 'number' },
+    left: '81%',
+    duration: 13.9,
+    delay: -6.8,
+    scale: 0.58,
+    opacity: 0.38,
+    swayX: 26,
+    startRot: -28,
+    endRot: 185,
+    blur: 0.3,
+  },
+  {
+    card: { id: 'rain-12', color: 'red', value: 'skip', category: 'action' },
+    left: '88%',
+    duration: 15.6,
+    delay: -1.9,
+    scale: 0.52,
+    opacity: 0.34,
+    swayX: -32,
+    startRot: 18,
+    endRot: -195,
+    blur: 0.5,
+  },
+  {
+    card: { id: 'rain-13', color: 'wild', value: 'wild_draw10', category: 'wild' },
+    left: '94%',
+    duration: 12.8,
+    delay: -8.5,
+    scale: 0.64,
+    opacity: 0.44,
+    swayX: -22,
+    startRot: -20,
+    endRot: 205,
+    blur: 0,
+  },
+  {
+    card: { id: 'rain-14', color: 'yellow', value: '9', category: 'number' },
+    left: '6%',
+    duration: 19.0,
+    delay: -16.2,
+    scale: 0.44,
+    opacity: 0.28,
+    swayX: 18,
+    startRot: 45,
+    endRot: -145,
+    blur: 1.1,
+  },
+  {
+    card: { id: 'rain-15', color: 'blue', value: 'reverse', category: 'action' },
+    left: '91%',
+    duration: 18.4,
+    delay: -13.2,
+    scale: 0.46,
+    opacity: 0.3,
+    swayX: 22,
+    startRot: -32,
+    endRot: 170,
+    blur: 0.9,
+  },
+];
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   savedName,
   savedAvatarUrl,
@@ -211,6 +409,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Translucent Radial Vignette so the 3D Emerald Billiards Table Shines Through */}
       <div className="nm-aura-crimson" />
       <div className="nm-aura-emerald" />
+
+      {/* Continuous Looping Falling UNO Cards Background Rain */}
+      <div className="nm-falling-cards-rain" aria-hidden="true">
+        {FALLING_BG_CARDS.map((item) => (
+          <div
+            key={item.card.id}
+            className="nm-falling-card-track"
+            style={
+              {
+                left: item.left,
+                '--fall-duration': `${item.duration}s`,
+                '--fall-delay': `${item.delay}s`,
+                '--fall-scale': item.scale,
+                '--fall-opacity': item.opacity,
+                '--fall-sway': `${item.swayX}px`,
+                '--fall-rot-start': `${item.startRot}deg`,
+                '--fall-rot-end': `${item.endRot}deg`,
+                filter: item.blur > 0 ? `blur(${item.blur}px)` : 'none',
+              } as React.CSSProperties
+            }
+          >
+            <div className="nm-falling-card-spin">
+              <UnoCard
+                card={item.card}
+                size="sm"
+                faceDown={Boolean(item.faceDown)}
+                playable={false}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Top-Right Floating Copyright-Free Background Music Controls */}
       <div className="nm-home-top-music-bar">

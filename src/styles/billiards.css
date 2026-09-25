@@ -2319,6 +2319,56 @@ body,
   pointer-events: none;
 }
 
+/* Infinite Falling UNO Cards Rain Background */
+.nm-falling-cards-rain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 900px;
+}
+
+.nm-falling-card-track {
+  position: absolute;
+  top: -160px;
+  will-change: transform, opacity;
+  animation: nmCardFallLoop var(--fall-duration, 15s) linear var(--fall-delay, 0s) infinite;
+}
+
+.nm-falling-card-spin {
+  will-change: transform;
+  animation: nmCardSway3D calc(var(--fall-duration, 15s) * 0.45) ease-in-out var(--fall-delay, 0s) infinite alternate;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
+  border-radius: 12px;
+}
+
+@keyframes nmCardFallLoop {
+  0% {
+    transform: translate3d(0, -14vh, 0) scale(var(--fall-scale, 0.5)) rotate(var(--fall-rot-start, -20deg));
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--fall-opacity, 0.34);
+  }
+  90% {
+    opacity: var(--fall-opacity, 0.34);
+  }
+  100% {
+    transform: translate3d(var(--fall-sway, 24px), 118vh, 0) scale(var(--fall-scale, 0.5)) rotate(var(--fall-rot-end, 190deg));
+    opacity: 0;
+  }
+}
+
+@keyframes nmCardSway3D {
+  0% {
+    transform: translateX(calc(var(--fall-sway, 24px) * -0.5)) rotateY(-22deg) rotateX(10deg);
+  }
+  100% {
+    transform: translateX(calc(var(--fall-sway, 24px) * 0.5)) rotateY(22deg) rotateX(-10deg);
+  }
+}
+
 /* 2-Column Showcase Shell */
 .nm-showcase-shell {
   position: relative;
