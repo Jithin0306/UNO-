@@ -100,9 +100,18 @@ export type HostBroadcastMessage =
 
 const PEER_PREFIX = 'uno-billiards-royale-';
 
+const MATCHMAKING_BEACON_SLOTS = [
+  'uno-billiards-royale-mm-queue-0',
+  'uno-billiards-royale-mm-queue-1',
+  'uno-billiards-royale-mm-queue-2',
+];
+
 export class MultiplayerRoomManager {
   private peer: Peer | null = null;
   private secondaryPeer: Peer | null = null;
+  private mmBeaconPeer: Peer | null = null;
+  private mmSweepInterval: number | null = null;
+  private activeMmSlotIndex: number = -1;
   private connections: Map<number, DataConnection> = new Map();
   private hostConn: DataConnection | null = null;
   private lastBroadcastState: SyncedTableState | null = null;
@@ -114,6 +123,9 @@ export class MultiplayerRoomManager {
   public role: 'offline' | 'host' | 'client' = 'offline';
   public roomCode: string = '';
   public mySeatIndex: number = 0;
+  public isMatchmakingActive: boolean = false;
+
+  public onMatchmakingFoundRoom?: (roomCode: string) => void;
 
   public onClientJoined?: (
     seatIndex: number,
@@ -557,6 +569,11 @@ export class MultiplayerRoomManager {
     this.lastBroadcastState = state;
     if (this.role !== 'host') return;
 
+    // If match has launched onto the table or lobby is full (4/4), release the public matchmaking beacon slot
+    if (state.inLobby === false || this.connections.size >= 3) {
+      this.stopMatchmakingBeacon();
+    }
+
     this.connections.forEach((conn, seatIdx) => {
       if (!conn.open) return;
       conn.send({
@@ -566,6 +583,208 @@ export class MultiplayerRoomManager {
         state,
       } satisfies HostBroadcastMessage);
     });
+  }
+
+  /**
+   * Probes a specific public matchmaking queue beacon ID to check if another player online
+   * on the website is waiting for opponents. Returns their roomCode if available.
+   */
+  public probeMatchmakingSlot(
+    slotId: string,
+    timeoutMs: number = 2200
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      let settled = false;
+      let tempPeer: Peer | null = null;
+
+      const finish = (code: string | null) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        if (tempPeer) {
+          try {
+            tempPeer.destroy();
+          } catch {}
+          tempPeer = null;
+        }
+        resolve(code);
+      };
+
+      const timer = window.setTimeout(() => finish(null), timeoutMs);
+
+      try {
+        tempPeer = new Peer();
+        tempPeer.on('open', () => {
+          if (!tempPeer || settled) return;
+          const conn = tempPeer.connect(slotId, { reliable: true });
+
+          conn.on('open', () => {
+            try {
+              conn.send({ type: 'MM_SEEK_MATCH' });
+            } catch {}
+          });
+
+          conn.on('data', (raw: any) => {
+            if (
+              raw &&
+              typeof raw === 'object' &&
+              raw.type === 'MM_ROOM_OFFER' &&
+              typeof raw.roomCode === 'string' &&
+              raw.roomCode.length >= 4 &&
+              raw.roomCode !== this.roomCode
+            ) {
+              finish(raw.roomCode.toUpperCase());
+            }
+          });
+
+          conn.on('error', () => finish(null));
+          conn.on('close', () => finish(null));
+        });
+
+        tempPeer.on('error', () => finish(null));
+      } catch {
+        finish(null);
+      }
+    });
+  }
+
+  /**
+   * Scans the global PeerJS matchmaking queue slots for any active player waiting for a match.
+   */
+  public async findOpenMatchmakingRoom(
+    maxSlotExclusive: number = MATCHMAKING_BEACON_SLOTS.length
+  ): Promise<string | null> {
+    const count = Math.min(maxSlotExclusive, MATCHMAKING_BEACON_SLOTS.length);
+    for (let i = 0; i < count; i++) {
+      if (i === this.activeMmSlotIndex) continue;
+      const foundCode = await this.probeMatchmakingSlot(
+        MATCHMAKING_BEACON_SLOTS[i],
+        2100
+      );
+      if (foundCode && foundCode !== this.roomCode) {
+        return foundCode;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Registers this Host room in the public matchmaking queue beacon so any other person
+   * online on the website who clicks Matchmake automatically discovers and joins this room.
+   */
+  public startMatchmakingBeacon(slotIndex: number = 0) {
+    this.stopMatchmakingBeacon();
+    if (slotIndex >= MATCHMAKING_BEACON_SLOTS.length) {
+      slotIndex = 0;
+    }
+
+    this.isMatchmakingActive = true;
+    this.activeMmSlotIndex = slotIndex;
+    const slotId = MATCHMAKING_BEACON_SLOTS[slotIndex];
+
+    try {
+      const beacon = new Peer(slotId);
+      this.mmBeaconPeer = beacon;
+
+      beacon.on('open', () => {
+        this.onStatusChange?.(
+          `MATCHMAKING QUEUE LIVE • WAITING FOR ONLINE PLAYERS`
+        );
+      });
+
+      beacon.on('connection', (conn) => {
+        const sendOffer = () => {
+          if (
+            this.role === 'host' &&
+            this.roomCode &&
+            this.connections.size < 3 &&
+            this.lastBroadcastState?.inLobby !== false
+          ) {
+            try {
+              conn.send({
+                type: 'MM_ROOM_OFFER',
+                roomCode: this.roomCode,
+                hostName: this.localPlayerName,
+                currentPlayers: 1 + this.connections.size,
+                maxPlayers: 4,
+              });
+            } catch {}
+          }
+        };
+
+        conn.on('open', sendOffer);
+        conn.on('data', (raw: any) => {
+          if (raw && raw.type === 'MM_SEEK_MATCH') {
+            sendOffer();
+          }
+        });
+      });
+
+      beacon.on('error', async (err: any) => {
+        if (err?.type === 'unavailable-id') {
+          // Someone else is holding this matchmaking slot! Probe it to join them if they have a live room.
+          const foundCode = await this.probeMatchmakingSlot(slotId, 2200);
+          if (
+            foundCode &&
+            foundCode !== this.roomCode &&
+            this.connections.size === 0 &&
+            this.isMatchmakingActive
+          ) {
+            this.stopMatchmakingBeacon();
+            this.onMatchmakingFoundRoom?.(foundCode);
+            return;
+          }
+          // Otherwise, if that slot was a stale ghost ID, claim the next slot
+          if (
+            this.isMatchmakingActive &&
+            slotIndex + 1 < MATCHMAKING_BEACON_SLOTS.length
+          ) {
+            this.startMatchmakingBeacon(slotIndex + 1);
+          }
+        }
+      });
+
+      // Background merge sweep: if we are waiting solo (0 connected friends), periodically check lower slots
+      // so two simultaneous searchers always merge into one room automatically!
+      this.mmSweepInterval = window.setInterval(async () => {
+        if (
+          !this.isMatchmakingActive ||
+          this.role !== 'host' ||
+          this.connections.size > 0
+        ) {
+          return;
+        }
+        const scanCount =
+          this.activeMmSlotIndex > 0
+            ? this.activeMmSlotIndex
+            : MATCHMAKING_BEACON_SLOTS.length;
+        const foundCode = await this.findOpenMatchmakingRoom(scanCount);
+        if (
+          foundCode &&
+          foundCode !== this.roomCode &&
+          this.connections.size === 0 &&
+          this.isMatchmakingActive
+        ) {
+          this.stopMatchmakingBeacon();
+          this.onMatchmakingFoundRoom?.(foundCode);
+        }
+      }, 3600);
+    } catch {}
+  }
+
+  public stopMatchmakingBeacon() {
+    this.isMatchmakingActive = false;
+    this.activeMmSlotIndex = -1;
+    if (this.mmSweepInterval) {
+      window.clearInterval(this.mmSweepInterval);
+      this.mmSweepInterval = null;
+    }
+    if (this.mmBeaconPeer) {
+      try {
+        this.mmBeaconPeer.destroy();
+      } catch {}
+      this.mmBeaconPeer = null;
+    }
   }
 
   public sendActionToHost(action: ClientActionMessage) {
@@ -579,6 +798,7 @@ export class MultiplayerRoomManager {
   }
 
   public disconnect() {
+    this.stopMatchmakingBeacon();
     this.connections.forEach((c) => c.close());
     this.connections.clear();
     if (this.hostConn) {

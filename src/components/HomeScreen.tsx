@@ -17,6 +17,7 @@ import {
   Layers,
   Repeat,
   Sparkles,
+  Radio,
 } from 'lucide-react';
 import { GameMode, Player, UnoCardData } from '../types/uno';
 import { UnoCard } from './UnoCard';
@@ -49,6 +50,11 @@ interface HomeScreenProps {
   onToggleSevenZero: () => void;
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
+  onStartMatchmaking: (playerName: string) => Promise<{
+    status: 'joined' | 'hosting';
+    roomCode: string;
+  }>;
+  onCancelMatchmaking: () => void;
   onEnterOnlineTable: () => void;
   onOpenLegalRoute: (route: LegalPageRoute) => void;
 }
@@ -338,6 +344,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onToggleSevenZero,
   onHostOnlineRoom,
   onJoinOnlineRoom,
+  onStartMatchmaking,
+  onCancelMatchmaking,
   onEnterOnlineTable,
   onOpenLegalRoute,
 }) => {
@@ -348,7 +356,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [avatarSavedToast, setAvatarSavedToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'main' | 'custom' | 'online' | 'rules'
+    'main' | 'custom' | 'online' | 'matchmaking' | 'rules'
   >(initialInviteCode ? 'online' : 'main');
   const [customPreset, setCustomPreset] = useState<'1v1' | '1v3' | 'no_bots'>(
     '1v1'
@@ -359,6 +367,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [mmElapsedSec, setMmElapsedSec] = useState(0);
+  const [autoStartSec, setAutoStartSec] = useState<number | null>(null);
+  const [autoStartPaused, setAutoStartPaused] = useState(false);
+
+  const onlineHumanCount = players.filter((p) => p.isActive && !p.isAI).length;
+  const activeReadySeatsCount = players.filter((p) => p.isActive).length;
 
   useEffect(() => {
     if (initialInviteCode) {
@@ -366,6 +380,69 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setActiveTab('online');
     }
   }, [initialInviteCode]);
+
+  // Elapsed timer while in Matchmaking Queue
+  useEffect(() => {
+    if (activeTab !== 'matchmaking' || mpRole === 'offline') {
+      setMmElapsedSec(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setMmElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, mpRole]);
+
+  // 10-second Auto-Start Countdown as soon as 2+ online players connect in Matchmaking
+  useEffect(() => {
+    if (
+      activeTab !== 'matchmaking' ||
+      mpRole !== 'host' ||
+      onlineHumanCount < 2 ||
+      autoStartPaused
+    ) {
+      setAutoStartSec(null);
+      return;
+    }
+
+    setAutoStartSec(10);
+    const countdown = window.setInterval(() => {
+      setAutoStartSec((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          window.clearInterval(countdown);
+          window.setTimeout(() => {
+            onEnterOnlineTable();
+          }, 0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(countdown);
+  }, [
+    activeTab,
+    mpRole,
+    onlineHumanCount,
+    autoStartPaused,
+    onEnterOnlineTable,
+  ]);
+
+  const handleOpenAndStartMatchmaking = async () => {
+    const finalName = commitNameSave();
+    setErrorMsg('');
+    setActiveTab('matchmaking');
+    if (mpRole !== 'offline') return;
+    setIsBusy(true);
+    try {
+      await onStartMatchmaking(finalName);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Could not start online matchmaking.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
 
   const commitNameSave = (): string => {
     const clean = nameInput.trim() || savedName || 'Commander';
@@ -716,7 +793,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <span className="nm-mode-cta-pill pill-outline">4 SEATS</span>
                 </button>
 
-                {/* 3. WEBRTC P2P ONLINE ROOM */}
+                {/* 3. GLOBAL ONLINE MATCHMAKING (FIND PLAYERS ONLINE NOW) */}
+                <button
+                  type="button"
+                  className="nm-mode-card nm-mode-matchmake"
+                  onClick={handleOpenAndStartMatchmaking}
+                >
+                  <div className="nm-mode-card-left">
+                    <div className="nm-mode-icon-box box-gold-pulse">
+                      <Radio size={18} />
+                    </div>
+                    <div className="nm-mode-text">
+                      <span className="nm-mode-title">
+                        ONLINE MATCHMAKING • FIND PLAYERS
+                      </span>
+                      <span className="nm-mode-desc">
+                        Auto-pair with real players online on the website right now
+                      </span>
+                    </div>
+                  </div>
+                  <span className="nm-mode-cta-pill pill-live-mm">
+                    {mpRole !== 'offline'
+                      ? `${onlineHumanCount}/4 LIVE`
+                      : 'MATCHMAKE'}
+                  </span>
+                </button>
+
+                {/* 4. WEBRTC P2P PRIVATE ROOM */}
                 <button
                   type="button"
                   className="nm-mode-card nm-mode-slate"
@@ -731,7 +834,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </div>
                     <div className="nm-mode-text">
                       <span className="nm-mode-title">
-                        PLAY WITH FRIENDS (ONLINE P2P)
+                        PLAY WITH FRIENDS (PRIVATE CODE)
                       </span>
                       <span className="nm-mode-desc">
                         Host a private 0-bot room or join with a 5-letter code
@@ -895,6 +998,245 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
 
             {/* ============================================================
+                GLOBAL ONLINE MATCHMAKING ARENA SUBPANEL
+               ============================================================ */}
+            {activeTab === 'matchmaking' && (
+              <motion.div
+                key="nm-tab-matchmaking"
+                className="nm-subpanel"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className="nm-subpanel-head">
+                  <button
+                    type="button"
+                    className="nm-back-btn"
+                    onClick={() => setActiveTab('main')}
+                  >
+                    <ArrowLeft size={14} />
+                    <span>BACK</span>
+                  </button>
+                  <span className="nm-subpanel-title">
+                    LIVE ONLINE MATCHMAKING
+                  </span>
+                </div>
+
+                <div className="nm-mm-arena-card">
+                  {/* Live Radar & Search Status */}
+                  <div className="nm-mm-radar-banner">
+                    <div
+                      className={`nm-mm-radar-orb ${
+                        onlineHumanCount >= 2 ? 'is-matched' : 'is-scanning'
+                      }`}
+                    >
+                      <Radio size={20} />
+                    </div>
+                    <div className="nm-mm-radar-copy">
+                      <div className="nm-mm-radar-headline">
+                        {mpRole === 'offline'
+                          ? isBusy
+                            ? 'CONNECTING TO GLOBAL QUEUE...'
+                            : 'READY TO FIND ONLINE PLAYERS'
+                          : onlineHumanCount >= 2
+                          ? `MATCH FOUND! (${onlineHumanCount}/4 ONLINE PLAYERS)`
+                          : 'SEARCHING WEBSITE FOR ONLINE PLAYERS...'}
+                      </div>
+                      <div className="nm-mm-radar-sub">
+                        {mpRole === 'offline' ? (
+                          'Click below to scan the website and pair with anyone matchmaking right now'
+                        ) : (
+                          <>
+                            <span>
+                              Queue Room <strong>#{roomCode}</strong>
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Time:{' '}
+                              <strong>
+                                {String(Math.floor(mmElapsedSec / 60)).padStart(
+                                  2,
+                                  '0'
+                                )}
+                                :
+                                {String(mmElapsedSec % 60).padStart(2, '0')}
+                              </strong>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Auto-Start Banner when 2+ Online Human Players have Matched */}
+                  {mpRole === 'host' && onlineHumanCount >= 2 && (
+                    <div className="nm-mm-autostart-bar">
+                      <div className="nm-mm-autostart-info">
+                        <Sparkles size={14} />
+                        <span>
+                          {autoStartPaused
+                            ? 'Auto-start paused • Waiting for more players'
+                            : `Match starting in ${autoStartSec ?? 10}s...`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="nm-mm-pause-btn"
+                        onClick={() => setAutoStartPaused((prev) => !prev)}
+                      >
+                        {autoStartPaused ? 'RESUME TIMER' : 'WAIT FOR 4/4'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 4-Seat Real-Time Matchmaking Lobby Roster */}
+                  <div className="nm-lobby-roster-box">
+                    <div className="nm-lobby-roster-header">
+                      <span>MATCHMAKING QUEUE SEATS (LIVE)</span>
+                      <span className="nm-lobby-roster-count">
+                        {onlineHumanCount} ONLINE •{' '}
+                        {players.filter((p) => p.isActive && p.isAI).length} BOT
+                      </span>
+                    </div>
+
+                    <div className="nm-lobby-seats-grid">
+                      {players.map((p, idx) => {
+                        const isMe = idx === mySeatIndex;
+                        const isOccupied = p.isActive;
+                        const isHuman = isOccupied && !p.isAI;
+                        const isBot = isOccupied && p.isAI;
+
+                        return (
+                          <div
+                            key={p.id || idx}
+                            className={`nm-lobby-seat-row ${
+                              isHuman
+                                ? 'is-human'
+                                : isBot
+                                ? 'is-bot'
+                                : 'is-empty'
+                            }`}
+                          >
+                            <div className="nm-lobby-seat-left">
+                              <img
+                                src={p.avatarUrl || DEFAULT_HUMAN_AVATAR}
+                                alt={p.name}
+                                className="nm-lobby-seat-avatar"
+                              />
+                              <div className="nm-lobby-seat-info">
+                                <span className="nm-lobby-seat-name">
+                                  {isOccupied
+                                    ? `${p.name}${isMe ? ' (YOU)' : ''}`
+                                    : mpRole !== 'offline'
+                                    ? `Seat ${idx + 1} • Searching online...`
+                                    : `Seat ${idx + 1} • Open`}
+                                </span>
+                                <span className="nm-lobby-seat-role">
+                                  {idx === 0 && isHuman
+                                    ? 'QUEUE HOST'
+                                    : isHuman
+                                    ? 'MATCHED ONLINE PLAYER'
+                                    : isBot
+                                    ? 'AI CHALLENGER'
+                                    : 'WAITING FOR MATCHMAKER'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="nm-lobby-seat-right">
+                              {isHuman && (
+                                <span className="nm-seat-pill pill-human">
+                                  CONNECTED
+                                </span>
+                              )}
+                              {isBot && (
+                                <>
+                                  <span className="nm-seat-pill pill-bot">
+                                    AI BOT
+                                  </span>
+                                  {mpRole === 'host' && idx > 0 && (
+                                    <button
+                                      type="button"
+                                      className="nm-seat-mini-btn btn-kick"
+                                      onClick={() => onRemoveBotFromSeat(idx)}
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                              {!isOccupied && mpRole === 'host' && idx > 0 && (
+                                <button
+                                  type="button"
+                                  className="nm-seat-mini-btn btn-add"
+                                  onClick={() => onAddBotToSeat(idx)}
+                                >
+                                  + AI BOT
+                                </button>
+                              )}
+                              {!isOccupied && mpRole !== 'host' && (
+                                <span className="nm-seat-pill pill-waiting">
+                                  SCANNING...
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Matchmaking Actions */}
+                  <div className="nm-mm-actions-col">
+                    {mpRole === 'offline' ? (
+                      <button
+                        type="button"
+                        className="nm-btn nm-btn-crimson"
+                        disabled={isBusy}
+                        onClick={handleOpenAndStartMatchmaking}
+                      >
+                        <Radio size={16} />
+                        <span>
+                          {isBusy
+                            ? 'SCANNING GLOBAL QUEUE...'
+                            : 'START ONLINE MATCHMAKING'}
+                        </span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="nm-btn nm-btn-emerald"
+                          disabled={activeReadySeatsCount < 2}
+                          onClick={onEnterOnlineTable}
+                        >
+                          <Play size={15} fill="currentColor" />
+                          <span>
+                            {activeReadySeatsCount >= 2
+                              ? `START MATCH NOW (${activeReadySeatsCount}/4 PLAYERS)`
+                              : 'WAITING FOR 1 MORE PLAYER OR + AI BOT'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="nm-btn nm-btn-outline-gold"
+                          onClick={() => {
+                            setAutoStartPaused(false);
+                            onCancelMatchmaking();
+                          }}
+                        >
+                          <span>LEAVE MATCHMAKING QUEUE</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ============================================================
                 WEBRTC P2P ROOM SUBPANEL
                ============================================================ */}
             {activeTab === 'online' && (
@@ -920,6 +1262,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {mpRole === 'offline' ? (
                   <div className="nm-online-stack">
+                    <div className="nm-online-section">
+                      <span className="nm-section-caption">
+                        AUTO-PAIR WITH PLAYERS ONLINE ON WEBSITE RIGHT NOW
+                      </span>
+                      <button
+                        type="button"
+                        className="nm-btn nm-btn-emerald"
+                        disabled={isBusy}
+                        onClick={handleOpenAndStartMatchmaking}
+                      >
+                        <Radio size={16} />
+                        <span>FIND ONLINE PLAYERS (MATCHMAKE)</span>
+                      </button>
+                    </div>
+
+                    <div className="nm-divider-line">
+                      <span>OR HOST PRIVATE ROOM</span>
+                    </div>
+
                     <div className="nm-online-section">
                       <span className="nm-section-caption">
                         HOST A PRIVATE ROOM (STARTS WITH 0 BOTS FOR FRIENDS)

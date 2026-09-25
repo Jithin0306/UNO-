@@ -2348,7 +2348,80 @@ export function App() {
             setMpRole('client');
             setRoomCode(codeToJoin.toUpperCase());
           }}
+          onStartMatchmaking={async (playerName) => {
+            handleSaveMyName(playerName);
+            const prefs = getPrivacyPreferences();
+            const avatarToShare = prefs.p2p_avatar_sharing
+              ? myAvatarUrl
+              : DEFAULT_HUMAN_AVATAR;
+
+            // 1. Scan active global matchmaking beacons first to connect with anyone already searching online
+            setMpStatusText('SCANNING FOR ONLINE PLAYERS...');
+            const existingCode = await mpManager.findOpenMatchmakingRoom();
+            if (existingCode) {
+              setMpStatusText(`MATCH FOUND (#${existingCode})! CONNECTING...`);
+              await mpManager.joinRoom(
+                existingCode,
+                playerName,
+                avatarToShare
+              );
+              setMpRole('client');
+              setRoomCode(existingCode.toUpperCase());
+              return { status: 'joined', roomCode: existingCode.toUpperCase() };
+            }
+
+            // 2. Otherwise open a new room AND register it on the global matchmaking queue beacon
+            const code = await mpManager.startHosting(playerName);
+            setMpRole('host');
+            setRoomCode(code);
+            setMySeatIndex(0);
+            setPlayers((prev) =>
+              prev.map((p, idx) =>
+                idx === 0
+                  ? {
+                      ...p,
+                      name: playerName,
+                      avatarUrl: myAvatarUrl,
+                      title: 'MATCHMAKER HOST',
+                      isActive: true,
+                    }
+                  : p.isAI
+                  ? { ...p, isActive: false }
+                  : p
+              )
+            );
+            setTurnIndex(0);
+
+            mpManager.onMatchmakingFoundRoom = async (discoveredCode) => {
+              if (mpManager.getConnectedPeerCount() > 0) return;
+              try {
+                mpManager.disconnect();
+                await mpManager.joinRoom(
+                  discoveredCode,
+                  playerName,
+                  avatarToShare
+                );
+                setMpRole('client');
+                setRoomCode(discoveredCode.toUpperCase());
+              } catch {}
+            };
+
+            mpManager.startMatchmakingBeacon(0);
+            return { status: 'hosting', roomCode: code };
+          }}
+          onCancelMatchmaking={() => {
+            mpManager.stopMatchmakingBeacon();
+            if (mpRole !== 'offline') {
+              mpManager.disconnect();
+            }
+            setMpRole('offline');
+            setRoomCode('');
+            setMySeatIndex(0);
+            setConnectedFriendsCount(0);
+            startNewMatch(mode, [true, false, true, false]);
+          }}
           onEnterOnlineTable={() => {
+            mpManager.stopMatchmakingBeacon();
             if (mpRole === 'host') {
               startNewMatch(mode);
             }
