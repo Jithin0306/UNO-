@@ -30,12 +30,22 @@ import { PlayerHand } from './components/PlayerHand';
 import { CardFlightLayer } from './components/CardFlightLayer';
 import { GameHUD } from './components/GameHUD';
 import { HomeScreen } from './components/HomeScreen';
+import { PrivacyLegalHub, LegalPageRoute } from './components/PrivacyLegalHub';
 import {
   BOT_AVATAR_JAX,
   BOT_AVATAR_KAIRO,
   BOT_AVATAR_NYX,
   DEFAULT_HUMAN_AVATAR,
 } from './utils/avatarImage';
+import {
+  sanitizePlayerName,
+  sanitizeAvatarDataUrl,
+  getPrivacyPreferences,
+  savePrivacyPreferences,
+  recordMatchStatistic,
+  logSecurityEvent,
+  getOrCreatePlayerId,
+} from './utils/securityValidation';
 
 const INITIAL_PLAYERS_META: Array<{
   id: string;
@@ -179,6 +189,32 @@ export function App() {
   const [activeElimination, setActiveElimination] =
     useState<EliminationEvent | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
+  const [activeLegalRoute, setActiveLegalRoute] =
+    useState<LegalPageRoute | null>(null);
+
+  const handleOpenLegalRoute = useCallback((route: LegalPageRoute) => {
+    setActiveLegalRoute(route);
+    try {
+      const basePath = window.location.pathname.includes('/UNO-')
+        ? `/UNO-/${route}`
+        : `/${route}`;
+      window.history.pushState({ legalRoute: route }, '', basePath);
+    } catch {
+      // Ignore pushState errors
+    }
+  }, []);
+
+  const handleCloseLegalRoute = useCallback(() => {
+    setActiveLegalRoute(null);
+    try {
+      const rootPath = window.location.pathname.includes('/UNO-')
+        ? '/UNO-/'
+        : '/';
+      window.history.pushState({}, '', rootPath);
+    } catch {
+      // Ignore
+    }
+  }, []);
 
   const latestFlightRef = useRef<NetworkFlightEvent | null>(null);
   const latestEffectRef = useRef<TableSpecialEffect | null>(null);
@@ -331,21 +367,72 @@ export function App() {
   );
 
   useEffect(() => {
+    getOrCreatePlayerId();
     startNewMatch(mode, [true, false, true, false]);
 
-    // If URL has ?room=XXXXX, pre-fill the room code on the HomeScreen so the friend can type/save their name and click JOIN TABLE
+    // Support direct URL navigation to /privacy-policy, /privacy-settings, /cookie-policy, /terms, /community-guidelines, /security
+    const validRoutes: LegalPageRoute[] = [
+      'privacy-policy',
+      'privacy-settings',
+      'cookie-policy',
+      'terms',
+      'community-guidelines',
+      'security',
+      'delete-account',
+      'download-data',
+      'report-player',
+      'contact',
+    ];
+    const pathSlug = window.location.pathname
+      .replace(/^\/UNO-\/?/i, '')
+      .replace(/^\/+|\/+$/g, '')
+      .toLowerCase();
+    const hashSlug = window.location.hash
+      .replace(/^#\/?/, '')
+      .trim()
+      .toLowerCase();
     const params = new URLSearchParams(window.location.search);
+    const pageParam = (params.get('page') || '').trim().toLowerCase();
+
+    const matchedRoute = validRoutes.find(
+      (r) => r === pathSlug || r === hashSlug || r === pageParam
+    );
+    if (matchedRoute) {
+      setActiveLegalRoute(matchedRoute);
+    }
+
+    // If URL has ?room=XXXXX, pre-fill the room code on the HomeScreen so the friend can type/save their name and click JOIN TABLE
     const inviteRoom = params.get('room');
     if (inviteRoom && inviteRoom.trim()) {
       setInitialInviteCode(inviteRoom.trim().toUpperCase());
       setShowHomeScreen(true);
     }
 
+    const handlePopState = () => {
+      const nextSlug = window.location.pathname
+        .replace(/^\/UNO-\/?/i, '')
+        .replace(/^\/+|\/+$/g, '')
+        .toLowerCase();
+      const found = validRoutes.find((r) => r === nextSlug);
+      setActiveLegalRoute(found || null);
+    };
+    window.addEventListener('popstate', handlePopState);
+
     return () => {
+      window.removeEventListener('popstate', handlePopState);
       if (aiTimerRef.current) window.clearTimeout(aiTimerRef.current);
       if (elimTimerRef.current) window.clearTimeout(elimTimerRef.current);
     };
   }, []);
+
+  // Record local match statistics when a match finishes (only if user opted in)
+  useEffect(() => {
+    if (winner) {
+      const myCurrentPlayer = players[mySeatIndex];
+      const iWon = Boolean(myCurrentPlayer && winner.id === myCurrentPlayer.id);
+      recordMatchStatistic(iWon, winner.hand.length > 0);
+    }
+  }, [winner?.id]);
 
   // Broadcast authoritative state from Host whenever core state updates
   useEffect(() => {
@@ -1378,14 +1465,49 @@ export function App() {
     mpManager.onClientAction = (msg: ClientActionMessage) => {
       if (msg.type === 'PLAY_CARD') {
         const seatPlayer = players[msg.seatIndex];
-        const card = seatPlayer?.hand.find((c) => c.id === msg.cardId);
-        if (card && turnIndex === msg.seatIndex) {
-          commitCardPlay(msg.seatIndex, card, msg.chosenWildColor);
+        if (!seatPlayer || !seatPlayer.isActive || seatPlayer.isEliminated) {
+          logSecurityEvent(
+            'INVALID_TURN_REJECTED',
+            `Seat ${msg.seatIndex + 1} attempted PLAY_CARD while inactive/eliminated`
+          );
+          return;
         }
+        if (turnIndex !== msg.seatIndex) {
+          logSecurityEvent(
+            'INVALID_TURN_REJECTED',
+            `Seat ${msg.seatIndex + 1} attempted PLAY_CARD out of turn (active turn=${turnIndex + 1})`
+          );
+          return;
+        }
+        const card = seatPlayer.hand.find((c) => c.id === msg.cardId);
+        if (!card) {
+          logSecurityEvent(
+            'INVALID_CARD_OWNERSHIP',
+            `Seat ${msg.seatIndex + 1} attempted to play unowned card ID`
+          );
+          return;
+        }
+        const topDiscard = discardPile[discardPile.length - 1];
+        if (
+          topDiscard &&
+          !canPlayCard(card, topDiscard, activeColor, pendingPenalty)
+        ) {
+          logSecurityEvent(
+            'ILLEGAL_CARD_PLAY_REJECTED',
+            `Seat ${msg.seatIndex + 1} attempted illegal play (${card.color} ${card.value})`
+          );
+          return;
+        }
+        commitCardPlay(msg.seatIndex, card, msg.chosenWildColor);
       } else if (msg.type === 'DRAW_CARD') {
-        if (turnIndex === msg.seatIndex) {
-          executePlayerDraw(msg.seatIndex);
+        if (turnIndex !== msg.seatIndex) {
+          logSecurityEvent(
+            'INVALID_TURN_REJECTED',
+            `Seat ${msg.seatIndex + 1} attempted DRAW_CARD out of turn`
+          );
+          return;
         }
+        executePlayerDraw(msg.seatIndex);
       } else if (msg.type === 'CALL_UNO') {
         soundFX.playSpecialEffect('uno');
         setPlayers((prev) =>
@@ -1398,7 +1520,11 @@ export function App() {
           executeSevenSwapForSeat(msg.seatIndex, msg.targetPlayerId);
         }
       } else if (msg.type === 'UPDATE_NAME') {
-        const cleanName = msg.playerName.trim();
+        const cleanName = sanitizePlayerName(msg.playerName);
+        const cleanAvatar =
+          msg.avatarUrl !== undefined
+            ? sanitizeAvatarDataUrl(msg.avatarUrl, DEFAULT_HUMAN_AVATAR)
+            : undefined;
         setPlayers((prev) =>
           prev.map((p, idx) =>
             idx === msg.seatIndex
@@ -1406,7 +1532,7 @@ export function App() {
                   ...p,
                   name: cleanName || p.name,
                   avatarUrl:
-                    msg.avatarUrl !== undefined ? msg.avatarUrl : p.avatarUrl,
+                    cleanAvatar !== undefined ? cleanAvatar : p.avatarUrl,
                 }
               : p
           )
@@ -1787,18 +1913,26 @@ export function App() {
 
   const handleSaveMyName = useCallback(
     (newName: string) => {
-      const clean = newName.trim();
+      const clean = sanitizePlayerName(newName);
       if (!clean) return;
       setMyPlayerName(clean);
       try {
+        const prefs = getPrivacyPreferences();
+        savePrivacyPreferences({
+          ...prefs,
+          local_profile_persistence: true,
+        });
         localStorage.setItem('uno_player_name', clean);
       } catch {}
       if (mpRole === 'client') {
+        const prefs = getPrivacyPreferences();
         mpManager.sendActionToHost({
           type: 'UPDATE_NAME',
           seatIndex: mySeatIndex,
           playerName: clean,
-          avatarUrl: myAvatarUrl,
+          avatarUrl: prefs.p2p_avatar_sharing
+            ? myAvatarUrl
+            : DEFAULT_HUMAN_AVATAR,
         });
       } else {
         setPlayers((prev) =>
@@ -1813,15 +1947,22 @@ export function App() {
 
   const handleSaveMyAvatar = useCallback(
     (newAvatarUrl: string) => {
-      const targetAvatar =
-        newAvatarUrl && newAvatarUrl.trim()
-          ? newAvatarUrl.trim()
-          : INITIAL_PLAYERS_META[0].avatarUrl;
+      const targetAvatar = sanitizeAvatarDataUrl(
+        newAvatarUrl,
+        INITIAL_PLAYERS_META[0].avatarUrl
+      );
       setMyAvatarUrl(targetAvatar);
       try {
+        const prefs = getPrivacyPreferences();
         if (targetAvatar === INITIAL_PLAYERS_META[0].avatarUrl) {
           localStorage.removeItem('uno_player_avatar');
         } else {
+          // User explicitly uploaded a profile picture from gallery -> record affirmative consent for profile storage & room sharing
+          savePrivacyPreferences({
+            ...prefs,
+            local_profile_persistence: true,
+            p2p_avatar_sharing: true,
+          });
           localStorage.setItem('uno_player_avatar', targetAvatar);
         }
       } catch {}
@@ -2136,6 +2277,9 @@ export function App() {
               }
               setShowHomeScreen(true);
             }}
+            onOpenPrivacySettings={() =>
+              handleOpenLegalRoute('privacy-settings')
+            }
           />
         </>
       )}
@@ -2195,7 +2339,12 @@ export function App() {
           }}
           onJoinOnlineRoom={async (codeToJoin, guestName) => {
             handleSaveMyName(guestName);
-            await mpManager.joinRoom(codeToJoin, guestName, myAvatarUrl);
+            const prefs = getPrivacyPreferences();
+            await mpManager.joinRoom(
+              codeToJoin,
+              guestName,
+              prefs.p2p_avatar_sharing ? myAvatarUrl : DEFAULT_HUMAN_AVATAR
+            );
             setMpRole('client');
             setRoomCode(codeToJoin.toUpperCase());
           }}
@@ -2205,8 +2354,43 @@ export function App() {
             }
             setShowHomeScreen(false);
           }}
+          onOpenLegalRoute={handleOpenLegalRoute}
         />
       )}
+
+      {/* DPDP ACT 2023 & RULES 2025 PRIVACY, DATA RIGHTS, SECURITY & LEGAL HUB */}
+      <PrivacyLegalHub
+        activeRoute={activeLegalRoute}
+        onClose={handleCloseLegalRoute}
+        onSelectRoute={handleOpenLegalRoute}
+        currentPlayerName={myPlayer.name || myPlayerName}
+        currentRoomCode={roomCode}
+        players={players}
+        mpRole={mpRole}
+        onUpdatePlayerName={handleSaveMyName}
+        onResetPlayerAvatar={() =>
+          handleSaveMyAvatar(INITIAL_PLAYERS_META[0].avatarUrl)
+        }
+        onAccountDeleted={() => {
+          if (mpRole !== 'offline') {
+            mpManager.leaveWithHostMigration();
+          }
+          setMpRole('offline');
+          setRoomCode('');
+          setMySeatIndex(0);
+          setConnectedFriendsCount(0);
+          setMyPlayerName('Player 1');
+          setMyAvatarUrl(INITIAL_PLAYERS_META[0].avatarUrl);
+          getOrCreatePlayerId();
+          startNewMatch(mode, [true, false, true, false]);
+          setShowHomeScreen(true);
+        }}
+        onKickReportedSeat={(seatIdx) => {
+          if (mpRole === 'host' && seatIdx !== mySeatIndex) {
+            handleAddBotToSeat(seatIdx);
+          }
+        }}
+      />
     </div>
   );
 }

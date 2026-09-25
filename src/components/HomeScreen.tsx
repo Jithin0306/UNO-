@@ -25,6 +25,8 @@ import {
   DEFAULT_HUMAN_AVATAR,
 } from '../utils/avatarImage';
 import { MusicControls } from './MusicControls';
+import { SiteFooter } from './SiteFooter';
+import { LegalPageRoute } from './PrivacyLegalHub';
 
 interface HomeScreenProps {
   savedName: string;
@@ -48,6 +50,7 @@ interface HomeScreenProps {
   onHostOnlineRoom: (playerName: string) => Promise<string>;
   onJoinOnlineRoom: (roomCode: string, playerName: string) => Promise<void>;
   onEnterOnlineTable: () => void;
+  onOpenLegalRoute: (route: LegalPageRoute) => void;
 }
 
 const SHOWCASE_FAN_CARDS: Array<{
@@ -141,6 +144,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onHostOnlineRoom,
   onJoinOnlineRoom,
   onEnterOnlineTable,
+  onOpenLegalRoute,
 }) => {
   const [nameInput, setNameInput] = useState(
     savedName && savedName !== 'Player 1' ? savedName : 'Commander'
@@ -1015,6 +1019,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </AnimatePresence>
         </div>
       </motion.div>
+
+      <SiteFooter
+        onOpenLegalRoute={onOpenLegalRoute}
+        onOpenRulesTab={() => setActiveTab('rules')}
+      />
     </div>
   );
 };

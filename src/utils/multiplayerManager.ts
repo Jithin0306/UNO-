@@ -7,6 +7,13 @@ import {
   TableSpecialEffect,
   UnoCardData,
 } from '../types/uno';
+import {
+  sanitizePlayerName,
+  sanitizeAvatarDataUrl,
+  checkRateLimit,
+  logSecurityEvent,
+} from './securityValidation';
+import { DEFAULT_HUMAN_AVATAR } from './avatarImage';
 
 export interface NetworkFlightEvent {
   id: string;
@@ -160,8 +167,18 @@ export class MultiplayerRoomManager {
       let assignedSeat = -1;
 
       conn.on('data', (raw) => {
+        if (!raw || typeof raw !== 'object') {
+          logSecurityEvent(
+            'MALFORMED_PAYLOAD_BLOCKED',
+            'Rejected non-object WebRTC message payload'
+          );
+          return;
+        }
         const msg = raw as ClientActionMessage;
         if (msg.type === 'JOIN_HELLO') {
+          if (!checkRateLimit(`join_${conn.peer}`, 4, 15000)) {
+            return;
+          }
           // If this is a migrating client with a preferredSeatIndex, preserve their exact seat!
           if (
             typeof msg.preferredSeatIndex === 'number' &&
@@ -189,11 +206,15 @@ export class MultiplayerRoomManager {
 
           this.connections.set(assignedSeat, conn);
 
-          this.onClientJoined?.(
-            assignedSeat,
-            msg.playerName || `Player ${assignedSeat + 1}`,
-            msg.avatarUrl
+          const cleanName = sanitizePlayerName(
+            msg.playerName || `Player ${assignedSeat + 1}`
           );
+          const cleanAvatar = sanitizeAvatarDataUrl(
+            msg.avatarUrl,
+            DEFAULT_HUMAN_AVATAR
+          );
+
+          this.onClientJoined?.(assignedSeat, cleanName, cleanAvatar);
 
           if (this.lastBroadcastState) {
             conn.send({
@@ -212,6 +233,10 @@ export class MultiplayerRoomManager {
             });
           }
           if (verifiedSeat !== -1) {
+            // Sliding-window rate limit per connected seat (max 10 actions per 3 seconds)
+            if (!checkRateLimit(`action_seat_${verifiedSeat}`, 10, 3000)) {
+              return;
+            }
             this.onClientAction?.({
               ...msg,
               seatIndex: verifiedSeat,

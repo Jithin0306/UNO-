@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redirecting...</title>
+    <script>
+      (function () {
+        var path = window.location.pathname || '';
+        var slug = path
+          .replace(/^\/UNO-\/?/i, '')
+          .replace(/^\/+|\/+$/g, '')
+          .toLowerCase();
+        var base = path.toLowerCase().indexOf('/uno-') === 0 ? '/UNO-/' : '/';
+        if (slug) {
+          window.location.replace(
+            base + '?page=' + encodeURIComponent(slug) + window.location.hash
+          );
+        } else {
+          window.location.replace(base);
+        }
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

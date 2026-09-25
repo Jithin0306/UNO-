@@ -14,6 +14,7 @@ import {
   Clock,
   Skull,
   AlertTriangle,
+  Shield,
 } from 'lucide-react';
 import {
   ActiveColor,
@@ -65,6 +66,7 @@ interface GameHUDProps {
   onSelectWildColor: (color: ActiveColor) => void;
   onRematch: () => void;
   onNewMatch: () => void;
+  onOpenPrivacySettings?: () => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -105,6 +107,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onSelectWildColor,
   onRematch,
   onNewMatch,
+  onOpenPrivacySettings,
 }) => {
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [nickname, setNickname] = useState(myPlayerName || '');
@@ -236,9 +239,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         </div>
 
-        {/* Top-Right: Background Music Controls, SFX Mute & [ Exit ] */}
+        {/* Top-Right: Background Music Controls, Privacy/Security, SFX Mute & [ Exit ] */}
         <div className="hud-top-right-actions">
           <MusicControls compact />
+
+          {onOpenPrivacySettings && (
+            <button
+              type="button"
+              className="hud-icon-btn"
+              onClick={onOpenPrivacySettings}
+              aria-label="Privacy, Data Settings & Report Player"
+              title="Privacy Settings, Data Export/Deletion & Report Player"
+            >
+              <Shield size={15} />
+            </button>
+          )}
 
           <button
             type="button"
